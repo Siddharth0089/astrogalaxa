@@ -70,7 +70,6 @@ export default function App() {
   const [sessionError, setSessionError] = useState("");
   const [sessionRetry, setSessionRetry] = useState(0);
   const [resendAt, setResendAt] = useState(0);
-  const [expiresAt, setExpiresAt] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [authError, setAuthError] = useState("");
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
@@ -86,7 +85,6 @@ export default function App() {
   const codeInput = useRef<TextInput>(null);
 
   const secondsLeft = Math.max(0, Math.ceil((resendAt - now) / 1000));
-  const expirySecondsLeft = Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
   useEffect(() => {
     let active = true;
@@ -117,14 +115,10 @@ export default function App() {
   }, [sessionRetry]);
 
   useEffect(() => {
-    if (
-      screen !== "otp" ||
-      (resendAt <= Date.now() && expiresAt <= Date.now())
-    )
-      return;
+    if (screen !== "otp" || resendAt <= Date.now()) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [screen, resendAt, expiresAt]);
+  }, [screen, resendAt]);
 
   useEffect(() => {
     if (screen !== "home" || !token) return;
@@ -228,7 +222,6 @@ export default function App() {
       const timestamp = Date.now();
       setNow(timestamp);
       setResendAt(timestamp + (result.resendAfterSeconds ?? 60) * 1000);
-      setExpiresAt(timestamp + (result.expiresInSeconds ?? 600) * 1000);
       setCode("");
       go("otp");
     } catch (e) {
@@ -443,7 +436,6 @@ export default function App() {
         authError={authError}
         setAuthError={setAuthError}
         secondsLeft={secondsLeft}
-        expirySecondsLeft={expirySecondsLeft}
         codeInput={codeInput}
         onVerify={verify}
         onResend={login}

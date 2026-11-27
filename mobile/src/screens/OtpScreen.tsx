@@ -12,7 +12,6 @@ export function OtpScreen({
   authError,
   setAuthError,
   secondsLeft,
-  expirySecondsLeft = 600,
   codeInput,
   onVerify,
   onResend,
@@ -25,7 +24,6 @@ export function OtpScreen({
   authError: string;
   setAuthError: (e: string) => void;
   secondsLeft: number;
-  expirySecondsLeft?: number;
   codeInput: RefObject<TextInput | null>;
   onVerify: () => void;
   onResend: () => void;
@@ -38,11 +36,6 @@ export function OtpScreen({
     }, 120);
     return () => clearTimeout(timer);
   }, [codeInput]);
-
-  const isExpired = expirySecondsLeft <= 0;
-  const expMinutes = Math.floor(expirySecondsLeft / 60);
-  const expSeconds = expirySecondsLeft % 60;
-  const expiryFormatted = `${String(expMinutes).padStart(2, "0")}:${String(expSeconds).padStart(2, "0")}`;
 
   return (
     <View style={{ flex: 1 }}>
@@ -132,7 +125,7 @@ export function OtpScreen({
         >
           <View pointerEvents="none" style={{ flexDirection: "row", gap: 10 }}>
             {Array.from({ length: 6 }, (_, i) => {
-              const isCurrent = i === code.length && !isExpired;
+              const isCurrent = i === code.length;
               const isFilled = i < code.length;
               return (
                 <View
@@ -142,9 +135,7 @@ export function OtpScreen({
                     height: 60,
                     borderRadius: 14,
                     borderWidth: isCurrent ? 1.5 : 1,
-                    borderColor: isExpired
-                      ? "rgba(239, 68, 68, 0.4)"
-                      : isCurrent
+                    borderColor: isCurrent
                       ? "#F3C556"
                       : isFilled
                       ? "rgba(243, 197, 86, 0.45)"
@@ -197,21 +188,6 @@ export function OtpScreen({
           />
         </Pressable>
 
-        {/* Security Expiry Timer to prevent fraud */}
-        <View style={{ alignItems: "center" }}>
-          <Text
-            style={{
-              fontSize: 13,
-              color: isExpired ? "#FCA5A5" : "#A1A1AA",
-              letterSpacing: 0.2,
-            }}
-          >
-            {isExpired
-              ? "⚠️ Code expired for your security. Please request a new code."
-              : `🔒 Code expires in ${expiryFormatted}`}
-          </Text>
-        </View>
-
         {/* Advanced Error Banner */}
         {!!authError && (
           <View
@@ -238,7 +214,7 @@ export function OtpScreen({
           </View>
         )}
 
-        {/* 60s Resend Timer */}
+        {/* 60s Resend Timer with instant old code invalidation */}
         <View style={{ alignItems: "center", marginVertical: 4 }}>
           {secondsLeft > 0 ? (
             <Text style={s.helper}>
@@ -249,7 +225,12 @@ export function OtpScreen({
               accessibilityRole="button"
               accessibilityLabel="Resend code"
               disabled={busy}
-              onPress={onResend}
+              onPress={() => {
+                setCode("");
+                setAuthError("");
+                onResend();
+                codeInput.current?.focus();
+              }}
               hitSlop={8}
             >
               <Text
@@ -267,7 +248,7 @@ export function OtpScreen({
         {/* Action Button */}
         <Button
           label={busy ? "Verifying…" : "Verify and continue"}
-          disabled={code.length !== 6 || busy || isExpired}
+          disabled={code.length !== 6 || busy}
           busy={busy}
           onPress={onVerify}
         />
