@@ -2,6 +2,14 @@ import 'dotenv/config';
 import { z } from 'zod';
 import { isIP } from 'node:net';
 
+const optionalNonEmpty = z
+  .string()
+  .optional()
+  .transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  });
+
 const schema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -15,22 +23,23 @@ const schema = z
         (value) => !value || value.split(',').every((server) => isIP(server.trim()) !== 0),
         'Use comma-separated DNS server IP addresses',
       ),
-    REDIS_URL: z.string().optional(),
+    REDIS_URL: optionalNonEmpty,
+    CRON_SECRET: optionalNonEmpty,
     JWT_SECRET: z.string().min(32),
     OTP_HMAC_SECRET: z.string().min(32),
     OTP_LOG_CODES: z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
-    RESEND_API_KEY: z.string().optional(),
+    RESEND_API_KEY: optionalNonEmpty,
     EMAIL_FROM: z.string().default('Astro Galaxa <auth@example.com>'),
     LEGAL_SUPPORT_EMAIL: z.string().default('support@astrogalaxa.com'),
-    EXPO_ACCESS_TOKEN: z.string().optional(),
+    EXPO_ACCESS_TOKEN: optionalNonEmpty,
     GOOGLE_CLIENT_IDS: z.string().default(''),
     ALLOWED_ORIGINS: z.string().default('http://localhost:8081'),
-    GEMINI_API_KEY: z.string().optional(),
-    GROQ_API_KEY: z.string().optional(),
-    AI_API_KEY: z.string().optional(),
+    GEMINI_API_KEY: optionalNonEmpty,
+    GROQ_API_KEY: optionalNonEmpty,
+    AI_API_KEY: optionalNonEmpty,
     AI_BASE_URL: z.string().default('https://api.groq.com/openai/v1'),
     AI_MODEL: z.string().default('llama-3.1-8b-instant'),
     TRUST_PROXY: z.string().default('1'),
@@ -46,7 +55,8 @@ const schema = z
     }
     if (
       val.JWT_SECRET.includes('replace-with') ||
-      val.OTP_HMAC_SECRET.includes('replace-with')
+      val.OTP_HMAC_SECRET.includes('replace-with') ||
+      (val.CRON_SECRET && val.CRON_SECRET.includes('replace-with'))
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

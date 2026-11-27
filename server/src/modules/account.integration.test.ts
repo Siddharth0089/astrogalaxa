@@ -16,6 +16,7 @@ beforeAll(async () => {
   vi.stubEnv("MONGODB_URI", replica.getUri());
   vi.stubEnv("JWT_SECRET", secret);
   vi.stubEnv("OTP_HMAC_SECRET", "test-otp-secret-32-characters-long");
+  vi.stubEnv("CRON_SECRET", "test-cron-secret-value-123");
   await mongoose.connect(replica.getUri());
   models = await import("../models.js");
   const {
@@ -25,6 +26,7 @@ beforeAll(async () => {
     astrologersRouter,
     chatRouter,
   } = await import("./core.js");
+  const { cronRouter } = await import("./notifications.js");
   const { errorHandler } = await import("../common/http.js");
   app = express();
   app.use(express.json());
@@ -32,6 +34,7 @@ beforeAll(async () => {
   app.use("/tarot", tarotRouter);
   app.use("/astrologers", astrologersRouter);
   app.use("/chat", chatRouter);
+  app.use("/cron", cronRouter);
   app.use("/", publicRouter);
   app.use(errorHandler);
   await Promise.all([
@@ -597,6 +600,58 @@ describe("astrologers and unavailable AI", () => {
         .send({});
       expect(sentPush.status).toBe(200);
       expect(sentPush.body.data.sent).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("validates cron secret and sends deduplicated daily push sweep", async () => {
+    const pushUser = await models.User.create({
+      email: "cron-push@example.test",
+      name: "Maya",
+      language: "English",
+      nameSign: { name: "Leo" },
+      prefs: {
+        dailyHoroscope: true,
+        notifyTime: "00:00",
+        timezone: "UTC",
+      },
+    });
+    await models.DeviceToken.create({
+      userId: pushUser._id,
+      token: "ExponentPushToken[cron-sweep-token-123]",
+      platform: "android",
+    });
+
+    const unauth = await request(app).post("/cron/daily-push").send({});
+    expect(unauth.status).toBe(401);
+
+    const wrong = await request(app)
+      .post("/cron/daily-push")
+      .set("x-cron-secret", "wrong-secret")
+      .send({});
+    expect(wrong.status).toBe(401);
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: "ok" }] }),
+    } as unknown as Response);
+    try {
+      const first = await request(app)
+        .post("/cron/daily-push")
+        .set("x-cron-secret", "test-cron-secret-value-123")
+        .send({});
+      expect(first.status).toBe(200);
+      expect(first.body.data.swept).toBe(true);
+      expect(first.body.data.sent).toBeGreaterThanOrEqual(1);
+
+      const second = await request(app)
+        .post("/cron/daily-push")
+        .set("Authorization", "Bearer test-cron-secret-value-123")
+        .send({});
+      expect(second.status).toBe(200);
+      expect(second.body.data.sent).toBe(0);
     } finally {
       globalThis.fetch = originalFetch;
     }

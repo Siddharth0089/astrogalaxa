@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { createHash, randomInt } from "node:crypto";
 import { DateTime } from "luxon";
 import { env } from "../common/config.js";
+import { cacheDelete, cacheGetJson, cacheSetJson } from "../common/redis.js";
 import { tarotContent } from "../seeds/tarot-content.js";
 import { sendExpoPushMessages } from "./notifications.js";
 import {
@@ -405,13 +406,25 @@ publicRouter.get(
   asyncRoute(async (req: AuthRequest, res) => {
     const u = await User.findById(req.userId).lean();
     const tz = u?.prefs?.timezone || u?.birth?.timezone || "Asia/Kolkata";
-    ok(res, computePanchang(tz));
+    const cacheKey = `panchang:v1:${tz}`;
+    const cached = await cacheGetJson<ReturnType<typeof computePanchang>>(cacheKey);
+    if (cached) return ok(res, cached);
+
+    const data = computePanchang(tz);
+    await cacheSetJson(cacheKey, data, 300);
+    ok(res, data);
   }),
 );
 publicRouter.get(
   "/places/search",
   asyncRoute(async (req, res) => {
     const q = z.string().trim().min(2).max(100).parse(req.query.q);
+    const cacheKey = `places:v1:${q.toLowerCase()}`;
+    const cached = await cacheGetJson<
+      { name: string; lat: number; lng: number; timezone?: string }[]
+    >(cacheKey);
+    if (cached) return ok(res, cached);
+
     const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
     url.searchParams.set("name", q);
     url.searchParams.set("count", "8");
@@ -448,19 +461,20 @@ publicRouter.get(
           .optional(),
       })
       .parse(await response.json());
-    ok(
-      res,
-      (payload.results ?? [])
-        .filter((place) => place.timezone)
-        .map((place) => ({
-          name: [place.name, place.admin1, place.country]
-            .filter(Boolean)
-            .join(", "),
-          lat: place.latitude,
-          lng: place.longitude,
-          timezone: place.timezone,
-        })),
-    );
+    const results = (payload.results ?? [])
+      .filter((place) => place.timezone)
+      .map((place) => ({
+        name: [place.name, place.admin1, place.country]
+          .filter(Boolean)
+          .join(", "),
+        lat: place.latitude,
+        lng: place.longitude,
+        timezone: place.timezone,
+      }));
+    if (results.length > 0) {
+      await cacheSetJson(cacheKey, results, 86_400);
+    }
+    ok(res, results);
   }),
 );
 publicRouter.get(
@@ -1371,18 +1385,21 @@ astrologersRouter.get(
       .enum(["All", "Career", "Love", "Health"])
       .optional()
       .parse(req.query.specialty);
-    ok(
-      res,
-      await Astrologer.find(
-        specialty && specialty !== "All"
-          ? { verified: true, specialties: specialty }
-          : { verified: true },
+    const cacheKey = `astrologers:v1:${specialty || "All"}`;
+    const cached = await cacheGetJson<unknown[]>(cacheKey);
+    if (cached) return ok(res, cached);
+
+    const experts = await Astrologer.find(
+      specialty && specialty !== "All"
+        ? { verified: true, specialties: specialty }
+        : { verified: true },
+    )
+      .select(
+        "name specialties languages experienceYears ratingAvg ratingCount pricePerMinute status busyUntil verified",
       )
-        .select(
-          "name specialties languages experienceYears ratingAvg ratingCount pricePerMinute status busyUntil verified",
-        )
-        .lean(),
-    );
+      .lean();
+    await cacheSetJson(cacheKey, experts, 120);
+    ok(res, experts);
   }),
 );
 astrologersRouter.post(
@@ -1607,6 +1624,12 @@ astrologersRouter.patch(
         expert.ratingCount = nextCount;
         expert.ratingAvg = Number(((avg * count + rating) / nextCount).toFixed(2));
         await expert.save();
+        await cacheDelete(
+          "astrologers:v1:All",
+          "astrologers:v1:Career",
+          "astrologers:v1:Love",
+          "astrologers:v1:Health",
+        );
       }
     }
     ok(res, { ended: true, thread });

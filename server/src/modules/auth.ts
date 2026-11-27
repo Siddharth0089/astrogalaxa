@@ -5,6 +5,7 @@ import { z } from "zod";
 import { OAuth2Client } from "google-auth-library";
 import { Resend } from "resend";
 import rateLimit from "express-rate-limit";
+import { createRedisStore } from "../common/redis.js";
 import { OtpChallenge, OtpRequestLimit, Session, User } from "../models.js";
 import { env } from "../common/config.js";
 import { AppError, asyncRoute, ok } from "../common/http.js";
@@ -57,8 +58,24 @@ const publicUser = (u: any) => ({
   prefs: u.prefs,
 });
 export const authRouter = Router();
-const requestLimiter = rateLimit({ windowMs: 60 * 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { success: false, data: null, error: { code: "RATE_LIMITED", message: "Please try again later" } } });
-const verifyLimiter = rateLimit({ windowMs: 15 * 60_000, limit: 10, standardHeaders: true, legacyHeaders: false, message: { success: false, data: null, error: { code: "RATE_LIMITED", message: "Please try again later" } } });
+const requestLimiter = rateLimit({
+  windowMs: 60 * 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  store: createRedisStore("rl:otp-req:"),
+  message: { success: false, data: null, error: { code: "RATE_LIMITED", message: "Please try again later" } },
+});
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  passOnStoreError: true,
+  store: createRedisStore("rl:otp-verify:"),
+  message: { success: false, data: null, error: { code: "RATE_LIMITED", message: "Please try again later" } },
+});
 authRouter.post(
   "/otp/request",
   requestLimiter,

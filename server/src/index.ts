@@ -16,7 +16,12 @@ import { errorHandler, ok } from './common/http.js';
 import { Astrologer, ChatMessage, ChatThread, Session } from './models.js';
 import { starterAstrologers } from './seeds/astrologers.js';
 import { authRouter } from './modules/auth.js';
-import { startDailyNotificationScheduler } from './modules/notifications.js';
+import { cronRouter, startDailyNotificationScheduler } from './modules/notifications.js';
+import {
+  attachSocketIoRedisAdapter,
+  closeRedisConnections,
+  createRedisStore,
+} from './common/redis.js';
 import {
   astrologersRouter,
   chatRouter,
@@ -63,7 +68,17 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '100kb' }));
-app.use(rateLimit({ windowMs: 15 * 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60_000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    store: createRedisStore('rl:global:'),
+    skip: (req) => req.path === '/health' || req.path === '/ready',
+  }),
+);
 
 const healthHandler = (_req: express.Request, res: express.Response) =>
   ok(res, { status: 'ok', env: env.NODE_ENV });
@@ -86,6 +101,7 @@ api.use('/', publicRouter);
 api.use('/tarot', tarotRouter);
 api.use('/chat', chatRouter);
 api.use('/astrologers', astrologersRouter);
+api.use('/cron', cronRouter);
 app.use('/api/v1', api);
 
 app.use(
@@ -109,6 +125,7 @@ app.use(
       '/api/v1/tarot/readings': { get: { summary: 'List readings' }, post: { summary: 'Draw & interpret reading' } },
       '/api/v1/astrologers': { get: { summary: 'List verified free astrologers' } },
       '/api/v1/astrologers/{id}/connect': { post: { summary: 'Start or resume free live consultation session' } },
+      '/api/v1/cron/daily-push': { post: { summary: 'Trigger scheduled daily horoscope push sweep (requires x-cron-secret)' } },
     },
   }),
 );
@@ -215,6 +232,7 @@ async function start() {
     await Astrologer.insertMany(starterAstrologers);
     logger.info('Seeded default verified free astrologers');
   }
+  await attachSocketIoRedisAdapter(io, logger);
   startDailyNotificationScheduler(logger);
   server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'Astro Galaxa API started'));
 }
@@ -228,5 +246,11 @@ start().catch((err) => {
 });
 
 for (const signal of ['SIGTERM', 'SIGINT']) {
-  process.on(signal, () => server.close(() => mongoose.disconnect().finally(() => process.exit(0))));
+  process.on(signal, () =>
+    server.close(() =>
+      Promise.allSettled([mongoose.disconnect(), closeRedisConnections()]).finally(() =>
+        process.exit(0),
+      ),
+    ),
+  );
 }

@@ -1,5 +1,8 @@
+import crypto from "node:crypto";
+import { Router } from "express";
 import { DateTime } from "luxon";
 import { env } from "../common/config.js";
+import { AppError, asyncRoute, ok } from "../common/http.js";
 import { DailyHoroscope, DeviceToken, User } from "../models.js";
 import { localizeHoroscope, seedHoroscope } from "./horoscope-content.js";
 
@@ -165,3 +168,42 @@ export function startDailyNotificationScheduler(logger?: PushLogger) {
   timer.unref();
   return timer;
 }
+
+export const cronRouter = Router();
+
+/**
+ * External cron trigger (e.g. cron-job.org on Render Free Tier) to run the daily push sweep even after cold sleep.
+ */
+cronRouter.post(
+  "/daily-push",
+  asyncRoute(async (req, res) => {
+    const expectedSecret = env.CRON_SECRET;
+    if (!expectedSecret) {
+      throw new AppError(
+        503,
+        "CRON_NOT_CONFIGURED",
+        "Cron push trigger is not configured",
+      );
+    }
+
+    const headerSecret = req.header("x-cron-secret")?.trim();
+    const bearerSecret = req
+      .header("authorization")
+      ?.match(/^Bearer\s+(.+)$/i)?.[1]
+      ?.trim();
+    const candidate = headerSecret || bearerSecret || "";
+
+    const expectedBuf = Buffer.from(expectedSecret);
+    const providedBuf = Buffer.from(candidate);
+    if (
+      expectedBuf.length === 0 ||
+      providedBuf.length !== expectedBuf.length ||
+      !crypto.timingSafeEqual(providedBuf, expectedBuf)
+    ) {
+      throw new AppError(401, "UNAUTHORIZED", "Invalid cron secret");
+    }
+
+    const sent = await runDailyHoroscopePushSweep(req.log);
+    ok(res, { swept: true, sent, sweptAt: new Date().toISOString() });
+  }),
+);
