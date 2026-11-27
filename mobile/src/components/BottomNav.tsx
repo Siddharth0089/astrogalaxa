@@ -101,60 +101,71 @@ export function BottomNav({
 
   return (
     <View
+      pointerEvents="box-none"
       style={{
-        height: 58,
-        flexDirection: "row",
-        backgroundColor: "rgba(10, 10, 18, 0.94)",
-        borderTopWidth: 1,
-        borderColor: "rgba(243, 197, 86, 0.18)",
-        paddingHorizontal: 8,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        paddingTop: 4,
+        backgroundColor: "transparent",
       }}
     >
-      {items.map((item) => {
-        const isSelected =
-          active === item.value || (active === "live" && item.value === "chat");
+      <View
+        style={{
+          height: 58,
+          flexDirection: "row",
+          borderRadius: 29,
+          backgroundColor: "rgba(18, 16, 28, 0.88)",
+          borderWidth: 1,
+          borderColor: "rgba(243, 197, 86, 0.3)",
+          paddingHorizontal: 8,
+          alignItems: "center",
+          shadowColor: C.gold,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.2,
+          shadowRadius: 16,
+          elevation: 10,
+          ...({ backdropFilter: "blur(16px)" } as object),
+        }}
+      >
+        {items.map((item) => {
+          const isSelected =
+            active === item.value ||
+            (active === "live" && item.value === "chat");
 
-        return (
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityLabel={item.label}
-            accessibilityState={{ selected: isSelected }}
-            key={item.value}
-            onPress={() => go(item.value)}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-              gap: 3,
-            }}
-          >
-            {isSelected && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  width: 24,
-                  height: 2.5,
-                  borderRadius: 2,
-                  backgroundColor: C.gold,
-                }}
-              />
-            )}
-            <NavIcon tab={item.value} active={isSelected} />
-            <Text
+          return (
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel={item.label}
+              accessibilityState={{ selected: isSelected }}
+              key={item.value}
+              onPress={() => go(item.value)}
               style={{
-                fontSize: 11,
-                color: isSelected ? C.gold : C.secondary,
-                fontWeight: isSelected ? "700" : "500",
-                letterSpacing: 0.2,
+                flex: 1,
+                height: 44,
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: isSelected
+                  ? "rgba(243, 197, 86, 0.14)"
+                  : "transparent",
+                gap: 2,
               }}
             >
-              {item.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <NavIcon tab={item.value} active={isSelected} />
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  color: isSelected ? C.gold : C.secondary,
+                  fontWeight: isSelected ? "700" : "500",
+                  letterSpacing: 0.3,
+                }}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }

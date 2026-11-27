@@ -136,12 +136,12 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
         ))}
       </View>
 
-      {/* Screen Content Layer - Full width on phones, cleanly centered on large displays */}
+      {/* Screen Content Layer - Full edge-to-edge on phones/tablets, centered on wide monitors */}
       <View
         style={{
           flex: 1,
           width: "100%",
-          maxWidth: 480,
+          maxWidth: width > 1024 ? 640 : "100%",
           alignSelf: "center",
         }}
       >
