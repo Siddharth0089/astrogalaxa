@@ -798,12 +798,30 @@ tarotRouter.post(
       };
     });
 
+    const currentUser = await User.findById(req.userId)
+      .select("language prefs.language")
+      .lean();
+    const preferredLang =
+      currentUser?.language || currentUser?.prefs?.language || "English";
+
     const qLead = question
-      ? `In response to "${question}" within ${topic}: `
-      : `${topic} Reading Summary: `;
+      ? preferredLang === "Hindi"
+        ? `"${question}" (${topic}) के उत्तर में: `
+        : preferredLang === "Hinglish"
+          ? `"${question}" (${topic}) ke jawab me: `
+          : `In response to "${question}" (${topic}): `
+      : preferredLang === "Hindi"
+        ? `${topic} टैरो सारांश: `
+        : preferredLang === "Hinglish"
+          ? `${topic} Tarot Summary: `
+          : `${topic} Reading Summary: `;
     const verdictLead =
       defaultMode === "yesNo"
-        ? `Oracle verdict leans ${drawnCards[0]?.yesNo || "Maybe"} through ${drawnCards[0]?.name} (${drawnCards[0]?.orientation}). `
+        ? preferredLang === "Hindi"
+          ? `${drawnCards[0]?.name} (${drawnCards[0]?.orientation}) के अनुसार संकेत "${drawnCards[0]?.yesNo || "Maybe"}" की ओर है। `
+          : preferredLang === "Hinglish"
+            ? `${drawnCards[0]?.name} (${drawnCards[0]?.orientation}) ke hisab se oracle sanket "${drawnCards[0]?.yesNo || "Maybe"}" ki taraf hai. `
+            : `Oracle verdict leans ${drawnCards[0]?.yesNo || "Maybe"} through ${drawnCards[0]?.name} (${drawnCards[0]?.orientation}). `
         : "";
     let interpretation =
       qLead +
@@ -815,14 +833,14 @@ tarotRouter.post(
         )
         .join(" ") +
       (drawnCards[drawnCards.length - 1]?.advice
-        ? ` Key Advice: ${drawnCards[drawnCards.length - 1].advice}`
+        ? ` ${
+            preferredLang === "Hindi"
+              ? "मुख्य सलाह:"
+              : preferredLang === "Hinglish"
+                ? "Khaas Salah:"
+                : "Key Advice:"
+          } ${drawnCards[drawnCards.length - 1].advice}`
         : "");
-
-    const currentUser = await User.findById(req.userId)
-      .select("language prefs.language")
-      .lean();
-    const preferredLang =
-      currentUser?.language || currentUser?.prefs?.language || "English";
 
     const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
     if (groqOrOpenAiKey) {

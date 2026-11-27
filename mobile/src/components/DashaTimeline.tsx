@@ -1,18 +1,26 @@
 import React from "react";
 import { Text, View } from "react-native";
-import { KundliData } from "../types";
+import { KundliData, Language } from "../types";
 import { C } from "../theme/colors";
+import { getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat(undefined, {
+const formatDate = (value: string, language: Language) =>
+  new Intl.DateTimeFormat(language === "Hindi" ? "hi-IN" : "en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(value));
 
-export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
+export function DashaTimeline({
+  dasha,
+  language = "English",
+}: {
+  dasha: KundliData["dasha"];
+  language?: Language;
+}) {
+  const t = getCopy(language).kundli.dasha;
   const current = dasha.current;
   return (
     <View style={{ gap: 16 }}>
@@ -28,7 +36,7 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
           }}
         >
           <Text style={{ color: "#F6E7B8", fontSize: 12, lineHeight: 18 }}>
-            Note: Dasha timing is calculated using Moon longitude at noon. Add your exact birth time for pinpoint Antardasha dates.
+            {t.approxNote}
           </Text>
         </View>
       )}
@@ -53,11 +61,11 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
               textTransform: "uppercase",
             }}
           >
-            ✦ Active Vimshottari Mahadasha
+            {t.activeEyebrow}
           </Text>
-          <Text style={s.sign}>{current.planet} Mahadasha</Text>
+          <Text style={s.sign}>{current.planet} {t.mahadashaSuffix}</Text>
           <Text style={s.sub}>
-            {formatDate(current.start)} – {formatDate(current.end)}
+            {formatDate(current.start, language)} – {formatDate(current.end, language)}
           </Text>
 
           <View
@@ -88,10 +96,10 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
               }}
             >
               <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                ANTARDASHA SUB-PERIOD: {current.subperiod.planet.toUpperCase()}
+                {t.subPeriodPrefix} {current.subperiod.planet.toUpperCase()}
               </Text>
               <Text style={{ color: C.secondary, fontSize: 12 }}>
-                {formatDate(current.subperiod.start)} – {formatDate(current.subperiod.end)}
+                {formatDate(current.subperiod.start, language)} – {formatDate(current.subperiod.end, language)}
               </Text>
             </View>
           )}
@@ -101,7 +109,7 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
           </Text>
         </View>
       ) : (
-        <Text style={s.sub}>No current period is available.</Text>
+        <Text style={s.sub}>{t.noPeriod}</Text>
       )}
 
       <View style={{ gap: 8 }}>
@@ -114,7 +122,7 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
             textTransform: "uppercase",
           }}
         >
-          Life Cycle Timeline
+          {t.timelineHeading}
         </Text>
         <View
           style={{
@@ -159,10 +167,10 @@ export function DashaTimeline({ dasha }: { dasha: KundliData["dasha"] }) {
                       fontSize: 13.5,
                     }}
                   >
-                    {p.planet} Mahadasha{isNow ? " (Active)" : ""}
+                    {p.planet} {t.mahadashaSuffix}{isNow ? ` ${t.activeBadge}` : ""}
                   </Text>
                   <Text style={{ color: C.muted, fontSize: 12 }}>
-                    {formatDate(p.start)} – {formatDate(p.end)}
+                    {formatDate(p.start, language)} – {formatDate(p.end, language)}
                   </Text>
                 </View>
               </View>

@@ -6,7 +6,7 @@ import { PlanetsTable } from "../components/PlanetsTable";
 import { DashaTimeline } from "../components/DashaTimeline";
 import { GunMilanMatch } from "../components/GunMilanMatch";
 import { ZodiacIcon } from "../components/ZodiacBadge";
-import { KundliData, Screen } from "../types";
+import { KundliData, Language, Screen } from "../types";
 import { C } from "../theme/colors";
 import {
   AVAKHADA_GUIDE,
@@ -14,7 +14,7 @@ import {
   HOUSE_MEANINGS,
   PLANET_MEANINGS,
 } from "../theme/astroGuide";
-import { formatTitleCase } from "../theme/i18n";
+import { formatTitleCase, getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
 const SIGN_LORDS: Record<string, string> = {
@@ -59,6 +59,7 @@ function formatDegreeShort(deg?: number): string {
 
 export function KundliScreen({
   name,
+  language = "English",
   birth,
   kundli,
   kundliLoading,
@@ -68,6 +69,7 @@ export function KundliScreen({
   onNavigate,
 }: {
   name: string;
+  language?: Language;
   birth: { dob: string; time: string; place: string };
   kundli: KundliData | null;
   kundliLoading: boolean;
@@ -76,6 +78,7 @@ export function KundliScreen({
   onRetry: () => void;
   onNavigate: (s: Screen) => void;
 }) {
+  const t = getCopy(language).kundli;
   const [tab, setTab] = useState<"Chart" | "Planets" | "Match" | "Insights" | "Dasha">("Chart");
   const [chartType, setChartType] = useState<ChartVariant>("lagna");
   const [chartStyle, setChartStyle] = useState<ChartStyleMode>("north");
@@ -95,22 +98,28 @@ export function KundliScreen({
   const mars = kundli?.planets.find((p) => p.id === "Mars");
   const manglikHouses = new Set([1, 2, 4, 7, 8, 12]);
   const manglikStatus = !kundli?.ascendant
-    ? "Needs exact birth time"
+    ? t.noBirthTime
     : mars?.house && manglikHouses.has(mars.house)
-      ? `Present (Mars in H${mars.house})`
-      : "Non-Manglik";
+      ? language === "Hindi"
+        ? `उपस्थित (मंगल भाव ${mars.house} में)`
+        : language === "Hinglish"
+          ? `Present (Mars H${mars.house} me)`
+          : `Active (Mars in House ${mars.house})`
+      : language === "English"
+        ? "Balanced (None)"
+        : "Non-Manglik";
 
   const chartOptions: { id: ChartVariant; label: string }[] = kundli?.ascendant
     ? [
-        { id: "lagna", label: "Lagna (D1)" },
-        { id: "chandra", label: "Moon" },
-        { id: "d9", label: "Navamsa (D9)" },
-        { id: "d10", label: "Dasamsa (D10)" },
+        { id: "lagna", label: t.charts.lagna },
+        { id: "chandra", label: t.charts.chandra },
+        { id: "d9", label: t.charts.d9 },
+        { id: "d10", label: t.charts.d10 },
       ]
     : [
-        { id: "chandra", label: "Moon Chart" },
-        { id: "d9", label: "Navamsa (D9)" },
-        { id: "d10", label: "Dasamsa (D10)" },
+        { id: "chandra", label: t.charts.chandraFull },
+        { id: "d9", label: t.charts.d9 },
+        { id: "d10", label: t.charts.d10 },
       ];
 
   const activeChartType: ChartVariant =
@@ -132,9 +141,9 @@ export function KundliScreen({
             textTransform: "uppercase",
           }}
         >
-          ✦ Janma Kundli · Lahiri Sidereal
+          {t.eyebrow}
         </Text>
-        <Text style={s.title}>{displayName}&apos;s Natal Chart</Text>
+        <Text style={s.title}>{t.title(displayName)}</Text>
         <View
           style={{
             flexDirection: "row",
@@ -145,7 +154,7 @@ export function KundliScreen({
           }}
         >
           <Text style={s.sub}>
-            {birth.dob || "Birth date"} · {birth.time || "No birth time"}
+            {birth.dob || "—"} · {birth.time || t.noBirthTime}
             {birth.place ? ` · ${birth.place}` : ""}
           </Text>
           {!birth.time && (
@@ -161,7 +170,7 @@ export function KundliScreen({
               }}
             >
               <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                + Add time
+                {t.addTimeBadge}
               </Text>
             </Pressable>
           )}
@@ -203,7 +212,7 @@ export function KundliScreen({
                   fontSize: 11.5,
                 }}
               >
-                {x}
+                {t.tabs[x]}
               </Text>
             </Pressable>
           );
@@ -211,15 +220,14 @@ export function KundliScreen({
       </View>
 
       {kundliLoading ? (
-        <Text style={s.sub}>Calculating your planetary ephemeris…</Text>
+        <Text style={s.sub}>{t.loading}</Text>
       ) : !kundli ? (
         <View style={[s.card, { gap: 12, padding: 20 }]}>
           <Text style={s.sub}>
-            {kundliError ||
-              "Sign in and complete your birth details to view your Kundli."}
+            {kundliError || t.emptyFallback}
           </Text>
           {!!token && (
-            <Button label="Try again" onPress={onRetry} variant="glass" />
+            <Button label={t.tryAgain} onPress={onRetry} variant="glass" />
           )}
         </View>
       ) : tab === "Chart" ? (
@@ -237,10 +245,10 @@ export function KundliScreen({
               }}
             >
               <Text style={{ color: C.gold, fontSize: 12, fontWeight: "700" }}>
-                Chandra Kundli Active
+                {t.moonActiveTitle}
               </Text>
               <Text style={{ color: "#EAE3D2", fontSize: 12, lineHeight: 18 }}>
-                Showing Moon, Navamsa (D9), and Dasamsa (D10) charts from your birth date. Add exact birth time to unlock Ascendant (Lagna) &amp; exact houses.
+                {t.moonActiveBody}
               </Text>
             </View>
           )}
@@ -287,8 +295,8 @@ export function KundliScreen({
             <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 6 }}>
               {(
                 [
-                  { id: "north" as const, label: "◊ North Indian" },
-                  { id: "south" as const, label: "⊞ South Indian" },
+                  { id: "north" as const, label: t.northStyle },
+                  { id: "south" as const, label: t.southStyle },
                 ] as const
               ).map((st) => {
                 const isActive = chartStyle === st.id;
@@ -373,7 +381,7 @@ export function KundliScreen({
                     fontWeight: "600",
                   }}
                 >
-                  {showChartGuide ? "Close Guide" : "? How to Read"}
+                  {showChartGuide ? t.closeGuide : t.howToRead}
                 </Text>
               </Pressable>
             </View>
@@ -391,7 +399,7 @@ export function KundliScreen({
                 }}
               >
                 <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                  PLANET SYMBOLS ON CHART
+                  {t.planetSymbolsHeading}
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {Object.entries(PLANET_MEANINGS).map(([pName, info]) => (
@@ -418,13 +426,13 @@ export function KundliScreen({
                     }}
                   >
                     <Text style={{ color: C.gold, fontSize: 11, fontWeight: "600" }}>
-                      * = Retrograde (Vakri)
+                      {language === "English" ? "* = Retrograde" : "* = Retrograde (Vakri)"}
                     </Text>
                   </View>
                 </View>
 
                 <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700", marginTop: 2 }}>
-                  THE 12 HOUSES (BHAVAS) EXPLAINED
+                  {t.housesHeading}
                 </Text>
                 <View style={{ gap: 6 }}>
                   {Object.entries(HOUSE_MEANINGS).map(([hNum, hData]) => (
@@ -457,7 +465,7 @@ export function KundliScreen({
               }}
             >
               <Text style={{ color: C.secondary, fontSize: 11, fontWeight: "600" }}>
-                Ascendant
+                {t.ascendant}
               </Text>
               {kundli.ascendant?.sign ? (
                 <View style={{ gap: 2 }}>
@@ -475,7 +483,7 @@ export function KundliScreen({
                 </View>
               ) : (
                 <Text style={{ color: C.gold, fontWeight: "600", fontSize: 12 }}>
-                  Add time
+                  {t.addTimeShort}
                 </Text>
               )}
             </View>
@@ -492,7 +500,7 @@ export function KundliScreen({
               }}
             >
               <Text style={{ color: C.secondary, fontSize: 11, fontWeight: "600" }}>
-                Moon Sign
+                {t.moonSign}
               </Text>
               <View style={{ gap: 2 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
@@ -502,7 +510,7 @@ export function KundliScreen({
                   </Text>
                 </View>
                 <Text style={{ color: C.muted, fontSize: 11 }}>
-                  Lord: {moonLord}
+                  {t.lordLabel} {moonLord}
                 </Text>
               </View>
             </View>
@@ -519,14 +527,14 @@ export function KundliScreen({
               }}
             >
               <Text style={{ color: C.secondary, fontSize: 11, fontWeight: "600" }}>
-                Nakshatra
+                {t.nakshatra}
               </Text>
               <View style={{ gap: 2 }}>
                 <Text style={{ color: C.text, fontWeight: "700", fontSize: 13 }}>
                   {kundli.nakshatra.name}
                 </Text>
                 <Text style={{ color: C.muted, fontSize: 11 }}>
-                  {kundli.nakshatra.pada ? `Pada ${kundli.nakshatra.pada}` : "Pada —"}
+                  {kundli.nakshatra.pada ? `${t.padaLabel} ${kundli.nakshatra.pada}` : `${t.padaLabel} —`}
                 </Text>
               </View>
             </View>
@@ -551,7 +559,7 @@ export function KundliScreen({
             >
               <View style={{ gap: 2, flex: 1, paddingRight: 8 }}>
                 <Text style={{ color: C.secondary, fontSize: 11, fontWeight: "600" }}>
-                  SHANI SADE SATI &amp; LIVE TRANSIT
+                  {t.sadeSatiLabel}
                 </Text>
                 <Text
                   style={{
@@ -564,27 +572,27 @@ export function KundliScreen({
                 </Text>
               </View>
               <Text style={{ color: C.gold, fontSize: 12, fontWeight: "600" }}>
-                View Insights →
+                {t.viewInsights}
               </Text>
             </Pressable>
           )}
 
           {!kundli.ascendant && (
             <Button
-              label="Add exact time of birth"
+              label={t.addExactTimeBtn}
               onPress={() => onNavigate("birth")}
               variant="glass"
             />
           )}
           <Button
-            label="Ask AI Pandit About This Chart"
+            label={t.askAiBtn}
             onPress={() => onNavigate("chat")}
           />
         </View>
       ) : tab === "Planets" ? (
-        <PlanetsTable planets={kundli.planets} />
+        <PlanetsTable planets={kundli.planets} language={language} />
       ) : tab === "Match" ? (
-        <GunMilanMatch />
+        <GunMilanMatch language={language} />
       ) : tab === "Insights" ? (
         <View style={{ gap: 16 }}>
           {/* 1. Live Transits (Gochar) & Shani Sade Sati */}
@@ -608,7 +616,7 @@ export function KundliScreen({
                   textTransform: "uppercase",
                 }}
               >
-                ✦ Live Transits (Gochar) &amp; Sade Sati
+                {t.transitsTitle}
               </Text>
               <View
                 style={{
@@ -632,7 +640,7 @@ export function KundliScreen({
                     fontWeight: "700",
                   }}
                 >
-                  Sade Sati: {kundli.transits.sadeSati.status}
+                  {t.sadeSatiHeading}: {kundli.transits.sadeSati.status}
                 </Text>
                 <Text style={{ color: "#EAE3D2", fontSize: 12.5, lineHeight: 19 }}>
                   {kundli.transits.sadeSati.summary}
@@ -657,7 +665,7 @@ export function KundliScreen({
                       {tp.id} {tp.retrograde ? "(R)" : ""}
                     </Text>
                     <Text style={{ color: C.text, fontSize: 13, fontWeight: "600" }}>
-                      {tp.sign} · H{tp.houseFromMoon} from Moon
+                      {tp.sign} · H{tp.houseFromMoon} ({t.fromMoon})
                     </Text>
                   </View>
                 ))}
@@ -685,7 +693,7 @@ export function KundliScreen({
                 textTransform: "uppercase",
               }}
             >
-              ✦ Planetary Yogas in Your Chart
+              {t.yogasTitle}
             </Text>
             {kundli.yogas && kundli.yogas.length > 0 ? (
               kundli.yogas.map((yoga, i) => (
@@ -708,7 +716,7 @@ export function KundliScreen({
               ))
             ) : (
               <Text style={s.sub}>
-                Balanced planetary alignments supporting steady life growth.
+                {t.yogasEmpty}
               </Text>
             )}
           </View>
@@ -740,7 +748,7 @@ export function KundliScreen({
                   textTransform: "uppercase",
                 }}
               >
-                ✦ Avakhada Chakra &amp; Profile
+                {t.avakhadaTitle}
               </Text>
               <Pressable
                 onPress={() => setShowAvakhadaGuide(!showAvakhadaGuide)}
@@ -764,7 +772,7 @@ export function KundliScreen({
                     fontWeight: "600",
                   }}
                 >
-                  {showAvakhadaGuide ? "Close" : "? Guide"}
+                  {showAvakhadaGuide ? t.closeBtn : t.guideBtn}
                 </Text>
               </Pressable>
             </View>
@@ -781,7 +789,7 @@ export function KundliScreen({
                 }}
               >
                 <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                  UNDERSTANDING AVAKHADA ATTRIBUTES
+                  {t.avakhadaGuideTitle}
                 </Text>
                 {Object.entries(AVAKHADA_GUIDE).map(([k, desc]) => (
                   <Text
@@ -798,23 +806,23 @@ export function KundliScreen({
             )}
 
             {[
-              ["Varna", kundli.avakhada?.varna || "—"],
-              ["Vashya", kundli.avakhada?.vashya || "—"],
-              ["Yoni", kundli.avakhada?.yoni || "—"],
-              ["Gana", kundli.avakhada?.gana || "—"],
-              ["Nadi", kundli.avakhada?.nadi || "—"],
-              ["Tatva (Element)", kundli.avakhada?.tatva || "—"],
-              ["Payaa (Moon Foot)", kundli.avakhada?.payaa || "—"],
-              ["Rashi Swami", moonLord],
-              ["Nakshatra Lord", nakshatraLord],
-              ["Manglik Yoga", manglikStatus],
+              [t.avakhadaRows.varna, kundli.avakhada?.varna || "—"],
+              [t.avakhadaRows.vashya, kundli.avakhada?.vashya || "—"],
+              [t.avakhadaRows.yoni, kundli.avakhada?.yoni || "—"],
+              [t.avakhadaRows.gana, kundli.avakhada?.gana || "—"],
+              [t.avakhadaRows.nadi, kundli.avakhada?.nadi || "—"],
+              [t.avakhadaRows.tatva, kundli.avakhada?.tatva || "—"],
+              [t.avakhadaRows.payaa, kundli.avakhada?.payaa || "—"],
+              [t.avakhadaRows.rashiLord, moonLord],
+              [t.avakhadaRows.nakshatraLord, nakshatraLord],
+              [t.avakhadaRows.manglik, manglikStatus],
               [
-                "Retrograde (Vakri)",
+                t.avakhadaRows.retrograde,
                 retrogradePlanets.length > 0
                   ? retrogradePlanets.join(", ")
-                  : "All planets direct",
+                  : t.avakhadaRows.allDirect,
               ],
-              ["Ayanamsa", "Lahiri (Chitrapaksha)"],
+              [t.avakhadaRows.ayanamsa, t.avakhadaRows.ayanamsaValue],
             ].map(([label, val], idx, arr) => (
               <View
                 key={label}
@@ -844,7 +852,7 @@ export function KundliScreen({
           </View>
         </View>
       ) : (
-        <DashaTimeline dasha={kundli.dasha} />
+        <DashaTimeline dasha={kundli.dasha} language={language} />
       )}
     </ScrollView>
   );

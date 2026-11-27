@@ -12,8 +12,9 @@ import {
 import Svg, { Path } from "react-native-svg";
 import { Button } from "../components/Button";
 import { TarotArt } from "../components/TarotArt";
-import { Screen, TarotReading } from "../types";
+import { Language, Screen, TarotReading } from "../types";
 import { C, disclaimer } from "../theme/colors";
+import { getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -63,6 +64,8 @@ function FlipCard({
   onFlip,
   isSingle,
   isYesNo,
+  uprightLabel,
+  reversedLabel,
 }: {
   card: CardItem;
   index: number;
@@ -70,6 +73,8 @@ function FlipCard({
   onFlip: () => void;
   isSingle: boolean;
   isYesNo: boolean;
+  uprightLabel: string;
+  reversedLabel: string;
 }) {
   const flipAnim = useRef(new Animated.Value(flipped ? 1 : 0)).current;
   const nativeDriver = Platform.OS !== "web";
@@ -321,7 +326,7 @@ function FlipCard({
               fontWeight: "700",
             }}
           >
-            {isReversed ? "Reversed ↺" : "Upright ↑"}
+            {isReversed ? reversedLabel : uprightLabel}
           </Text>
         </View>
       ) : (
@@ -336,7 +341,7 @@ function FlipCard({
           }}
         >
           <Text style={{ color: "#F6E7B8", fontSize: 10.5, fontWeight: "600" }}>
-            Revealing…
+            …
           </Text>
         </View>
       )}
@@ -346,13 +351,19 @@ function FlipCard({
 
 export function ReadingScreen({
   reading,
+  language = "English",
   onDrawAgain,
   onNavigate,
 }: {
   reading: TarotReading | null;
+  language?: Language;
   onDrawAgain: () => void;
   onNavigate: (s: Screen) => void;
 }) {
+  const copy = getCopy(language);
+  const t = copy.reading;
+  const topicNames = copy.tarot.topics as Record<string, string>;
+
   const [flippedMap, setFlippedMap] = useState<boolean[]>(() =>
     reading ? reading.cards.map(() => Boolean(reading.fromJournal)) : [],
   );
@@ -402,14 +413,15 @@ export function ReadingScreen({
         contentContainerStyle={[s.page, { paddingTop: 22 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={s.title}>Sacred Reading</Text>
-        <Text style={s.sub}>Choose cards from the Tarot Sanctuary to unveil guidance.</Text>
-        <Button label="Open Tarot Deck" onPress={onDrawAgain} />
+        <Text style={s.title}>{t.titleDone}</Text>
+        <Text style={s.sub}>{t.subTurning}</Text>
+        <Button label={t.backBtn} onPress={onDrawAgain} />
       </ScrollView>
     );
 
   const isYesNo = reading.mode === "yesNo";
   const primaryVerdict = reading.cards[0]?.yesNo || "Yes";
+  const localizedTopic = topicNames[reading.topic] || reading.topic;
 
   const toggleCardAt = (index: number) => {
     setFlippedMap((prev) => {
@@ -428,7 +440,7 @@ export function ReadingScreen({
       contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 48, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Sacred Editorial Header (No App Bar or Back Button) */}
+      {/* Sacred Editorial Header */}
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <SparkleGlyph size={12} />
@@ -442,15 +454,15 @@ export function ReadingScreen({
             }}
           >
             {reading.mode === "daily"
-              ? "Daily Card Draw"
+              ? t.modes.daily
               : isYesNo
-                ? "Yes / No Oracle"
-                : "3-Card Spread"}{" "}
-            • {reading.topic}
+                ? t.modes.yesNo
+                : t.modes.threeCard}{" "}
+            • {localizedTopic}
           </Text>
         </View>
         <Text style={s.title}>
-          {allFlipped ? "Oracle Prophecy" : "Turning Your Cards…"}
+          {allFlipped ? t.titleDone : t.titleTurning}
         </Text>
 
         {reading.question ? (
@@ -475,7 +487,7 @@ export function ReadingScreen({
                 textTransform: "uppercase",
               }}
             >
-              Sankalpa · Your Question
+              {t.questionLabel}
             </Text>
             <Text
               style={{
@@ -490,9 +502,7 @@ export function ReadingScreen({
           </View>
         ) : (
           <Text style={s.sub}>
-            {allFlipped
-              ? `Tailored ${reading.topic.toLowerCase()} guidance. Tap any card to view its sacred back.`
-              : "Watch your selected cards turn over to reveal their sacred message."}
+            {allFlipped ? t.subDone(localizedTopic) : t.subTurning}
           </Text>
         )}
       </View>
@@ -508,6 +518,8 @@ export function ReadingScreen({
             onFlip={() => toggleCardAt(idx)}
             isSingle={reading.cards.length === 1}
             isYesNo={isYesNo}
+            uprightLabel={t.upright}
+            reversedLabel={t.reversed}
           />
         ))}
       </View>
@@ -528,7 +540,7 @@ export function ReadingScreen({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <SparkleGlyph size={14} />
             <Text style={{ color: C.gold, fontSize: 13, fontWeight: "700" }}>
-              {flippedCount} of {totalCount} Cards Unveiled
+              {t.unveiledStatus(flippedCount, totalCount)}
             </Text>
           </View>
           <Text
@@ -539,9 +551,9 @@ export function ReadingScreen({
               lineHeight: 20,
             }}
           >
-            Your tailored {reading.topic.toLowerCase()} prophecy unlocks momentarily…
+            {t.unlockHint}
           </Text>
-          <Button label="Reveal All Now" onPress={flipAllCards} />
+          <Button label={t.revealAllBtn} onPress={flipAllCards} />
         </View>
       ) : (
         <Animated.View style={{ gap: 16, opacity: readingFade }}>
@@ -572,7 +584,7 @@ export function ReadingScreen({
                   letterSpacing: 1.4,
                 }}
               >
-                ✦ Oracle Verdict
+                {t.verdictLabel}
               </Text>
               <Text
                 style={{
@@ -591,7 +603,7 @@ export function ReadingScreen({
             </View>
           )}
 
-          {/* Celestial Oracle Synthesis Card (Matching HomeScreen Cosmic Guidance) */}
+          {/* Celestial Oracle Synthesis Card */}
           <View
             style={{
               borderRadius: 22,
@@ -625,7 +637,7 @@ export function ReadingScreen({
                     textTransform: "uppercase",
                   }}
                 >
-                  Cosmic Prophecy & Guidance
+                  {t.prophecyTitle}
                 </Text>
               </View>
               <View
@@ -639,7 +651,7 @@ export function ReadingScreen({
                 }}
               >
                 <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "700" }}>
-                  {reading.topic}
+                  {localizedTopic}
                 </Text>
               </View>
             </View>
@@ -710,7 +722,7 @@ export function ReadingScreen({
                         fontWeight: "700",
                       }}
                     >
-                      {card.orientation === "reversed" ? "Reversed ↺" : "Upright ↑"}
+                      {card.orientation === "reversed" ? t.reversed : t.upright}
                     </Text>
                   </View>
 
@@ -749,7 +761,7 @@ export function ReadingScreen({
                     card.meaning &&
                     card.topicInsight !== card.meaning && (
                       <Text style={{ color: C.secondary, fontSize: 12, lineHeight: 18 }}>
-                        Arcana Root: {card.meaning}
+                        {t.arcanaRoot} {card.meaning}
                       </Text>
                     )}
 
@@ -775,7 +787,7 @@ export function ReadingScreen({
                           textTransform: "uppercase",
                         }}
                       >
-                        Divine Counsel
+                        {t.counselLabel}
                       </Text>
                       <Text style={{ color: "#EAE3D2", fontSize: 12.5, lineHeight: 18 }}>
                         {card.advice}
@@ -791,9 +803,9 @@ export function ReadingScreen({
 
       {/* Action Buttons */}
       <View style={{ gap: 10 }}>
-        <Button label="Return to Tarot Sanctuary" onPress={onDrawAgain} variant="glass" />
+        <Button label={t.backBtn} onPress={onDrawAgain} variant="glass" />
         <Button
-          label="Discuss Reading with AI Pandit"
+          label={t.discussAiBtn}
           onPress={() => onNavigate("chat")}
         />
       </View>
@@ -802,4 +814,3 @@ export function ReadingScreen({
     </ScrollView>
   );
 }
-

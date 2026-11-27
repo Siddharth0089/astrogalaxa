@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { apiRequest } from "../../session";
-import { GunMilanResult, Place } from "../types";
+import { GunMilanResult, Language, Place } from "../types";
 import { Button } from "./Button";
 import { Field } from "./Field";
 import { C } from "../theme/colors";
+import { getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
-export function GunMilanMatch() {
+export function GunMilanMatch({ language = "English" }: { language?: Language }) {
+  const t = getCopy(language).kundli.match;
   const [partnerName, setPartnerName] = useState("");
   const [dob, setDob] = useState("");
   const [hour, setHour] = useState("");
@@ -166,7 +168,7 @@ export function GunMilanMatch() {
               textTransform: "uppercase",
             }}
           >
-            ✦ Ashtakoota Gun Milan Report
+            {t.scoreReport}
           </Text>
 
           <View
@@ -193,7 +195,7 @@ export function GunMilanMatch() {
               {result.totalScore}
             </Text>
             <Text style={{ color: C.secondary, fontSize: 12 }}>
-              out of {result.maxScore} ({scorePct}%)
+              {t.outOf} {result.maxScore} ({scorePct}%)
             </Text>
           </View>
 
@@ -227,7 +229,7 @@ export function GunMilanMatch() {
               }}
             >
               <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                YOU
+                {t.youLabel}
               </Text>
               <Text style={{ color: C.text, fontSize: 13, fontWeight: "600" }}>
                 {result.userSummary.moonSign}
@@ -271,7 +273,7 @@ export function GunMilanMatch() {
             }}
           >
             <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-              MANGLIK YOGA COMPARISON
+              {t.manglikHeading}
             </Text>
             <Text style={{ color: "#EAE3D2", fontSize: 12.5 }}>
               {result.manglik.verdict}
@@ -299,7 +301,7 @@ export function GunMilanMatch() {
               textTransform: "uppercase",
             }}
           >
-            ✦ 8-Fold Ashtakoota Breakdown
+            {t.breakdownTitle}
           </Text>
 
           <Pressable
@@ -315,7 +317,7 @@ export function GunMilanMatch() {
             }}
           >
             <Text style={{ color: showGuide ? C.gold : C.text, fontSize: 11, fontWeight: "600" }}>
-              {showGuide ? "Hide Score Guide" : "? How to read your 36-point Gun Milan score"}
+              {showGuide ? t.hideGuide : t.showGuide}
             </Text>
           </Pressable>
 
@@ -399,7 +401,7 @@ export function GunMilanMatch() {
         </View>
 
         <Button
-          label="Match Another Partner"
+          label={t.anotherBtn}
           onPress={() => setResult(null)}
           variant="glass"
         />
@@ -428,22 +430,22 @@ export function GunMilanMatch() {
             textTransform: "uppercase",
           }}
         >
-          ✦ Kundli Matching · Gun Milan
+          {t.eyebrow}
         </Text>
         <Text style={s.sub}>
-          Enter your partner&apos;s birth details to compute your 36-point Vedic Ashtakoota &amp; Manglik compatibility.
+          {t.formSub}
         </Text>
       </View>
 
       <Field
-        label="Partner's full name"
+        label={t.partnerName}
         value={partnerName}
         onChange={setPartnerName}
         placeholder="e.g. Ananya"
       />
 
       <Field
-        label="Partner's date of birth"
+        label={t.partnerDob}
         value={dob}
         onChange={setDob}
         placeholder="DD / MM / YYYY or YYYY-MM-DD"
@@ -451,7 +453,7 @@ export function GunMilanMatch() {
 
       {/* Dedicated Non-Overflowing Time Input */}
       <View style={{ gap: 8 }}>
-        <Text style={s.label}>Partner&apos;s time of birth (optional)</Text>
+        <Text style={s.label}>{t.partnerTime}</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <View
             style={{
@@ -565,7 +567,7 @@ export function GunMilanMatch() {
 
       <View style={{ gap: 8 }}>
         <Field
-          label="Partner's place of birth"
+          label={t.partnerPlace}
           value={placeText}
           onChange={(x) => {
             setSelectedPlace(null);
@@ -606,7 +608,7 @@ export function GunMilanMatch() {
       )}
 
       <Button
-        label={busy ? "Calculating 36 Gunas…" : "Match Kundlis (36 Gunas)"}
+        label={busy ? t.submitBusy : t.submitBtn}
         onPress={calculateMatch}
         disabled={busy}
       />

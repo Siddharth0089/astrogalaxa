@@ -35,6 +35,7 @@ export function ProfileScreen({
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [langStatus, setLangStatus] = useState("");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
 
@@ -78,6 +79,25 @@ export function ProfileScreen({
       active = false;
     };
   }, [authenticated, retry]);
+
+  const switchLanguage = async (nextLang: Language) => {
+    setLanguage(nextLang);
+    setLangStatus("Saving…");
+    setError("");
+    try {
+      const updated: UserProfile = await apiRequest(
+        "/users/me",
+        { language: nextLang },
+        true,
+        "PATCH",
+      );
+      setProfile(updated);
+      onSaved(updated);
+      setLangStatus("Applied ✓");
+    } catch {
+      setLangStatus("Tap Save changes below");
+    }
+  };
 
   const save = async () => {
     if (!name.trim()) return setError("Enter your full name.");
@@ -204,7 +224,14 @@ export function ProfileScreen({
         </View>
       </View>
       <View style={{ gap: 8 }}>
-        <Text style={s.label}>Preferred Language</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Text style={s.label}>Preferred Language</Text>
+          {!!langStatus && (
+            <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+              {langStatus}
+            </Text>
+          )}
+        </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {(
             [
@@ -217,7 +244,7 @@ export function ProfileScreen({
               key={item.id}
               accessibilityRole="button"
               accessibilityLabel={`Select language ${item.label}`}
-              onPress={() => setLanguage(item.id)}
+              onPress={() => void switchLanguage(item.id)}
               style={{
                 flex: 1,
                 height: 44,

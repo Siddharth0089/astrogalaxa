@@ -408,7 +408,7 @@ export function HomeScreen({
                 textTransform: "uppercase",
               }}
             >
-              ✦ Today&apos;s Vedic Panchang
+              {t.panchang.eyebrow}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={{ color: C.secondary, fontSize: 11 }}>
@@ -436,7 +436,7 @@ export function HomeScreen({
                     fontWeight: "600",
                   }}
                 >
-                  {showPanchangGuide ? "Close" : "? Guide"}
+                  {showPanchangGuide ? t.panchang.guideOpen : t.panchang.guideClosed}
                 </Text>
               </Pressable>
             </View>
@@ -454,7 +454,7 @@ export function HomeScreen({
               }}
             >
               <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-                HOW TO READ YOUR DAILY PANCHANG
+                {t.panchang.guideHeading}
               </Text>
               {PANCHANG_GUIDE.map((item) => (
                 <Text
@@ -472,10 +472,10 @@ export function HomeScreen({
 
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {[
-              ["Tithi", `${panchang.tithi} (${panchang.paksha.replace(" Paksha", "")})`],
-              ["Nakshatra", `${panchang.nakshatra.name} · P${panchang.nakshatra.pada}`],
-              ["Yoga", panchang.yoga],
-              ["Karana", panchang.karana],
+              [t.panchang.tithi, `${panchang.tithi} (${panchang.paksha.replace(" Paksha", "")})`],
+              [t.panchang.nakshatra, `${panchang.nakshatra.name} · P${panchang.nakshatra.pada}`],
+              [t.panchang.yoga, panchang.yoga],
+              [t.panchang.karana, panchang.karana],
             ].map(([lbl, val]) => (
               <View
                 key={lbl}
@@ -514,7 +514,7 @@ export function HomeScreen({
               }}
             >
               <Text style={{ color: "#7FE0A8", fontSize: 10.5, fontWeight: "700" }}>
-                ABHIJIT MUHURAT (AUSPICIOUS)
+                {t.panchang.abhijit}
               </Text>
               <Text style={{ color: C.text, fontSize: 12, fontWeight: "600" }}>
                 {panchang.abhijitMuhurat}
@@ -534,7 +534,7 @@ export function HomeScreen({
               }}
             >
               <Text style={{ color: "#FFB4AB", fontSize: 10.5, fontWeight: "700" }}>
-                RAHU KAAL (AVOID NEW STARTS)
+                {t.panchang.rahu}
               </Text>
               <Text style={{ color: C.text, fontSize: 12, fontWeight: "600" }}>
                 {panchang.rahuKaal}

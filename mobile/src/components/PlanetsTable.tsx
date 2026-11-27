@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { Planet } from "../types";
+import { Language, Planet } from "../types";
 import { ZodiacIcon } from "./ZodiacBadge";
 import { C } from "../theme/colors";
 import { DIGNITY_GUIDE, HOUSE_MEANINGS, PLANET_MEANINGS } from "../theme/astroGuide";
+import { getCopy } from "../theme/i18n";
 
 function formatDeg(deg?: number): string {
   if (deg === undefined || deg === null || !Number.isFinite(deg)) return "";
@@ -37,7 +38,14 @@ function dignityStyle(dignity?: Planet["dignity"]) {
   return null;
 }
 
-export function PlanetsTable({ planets }: { planets: Planet[] }) {
+export function PlanetsTable({
+  planets,
+  language = "English",
+}: {
+  planets: Planet[];
+  language?: Language;
+}) {
+  const t = getCopy(language).kundli.planets;
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showLegend, setShowLegend] = useState(false);
 
@@ -63,7 +71,7 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
           }}
         >
           <Text style={{ color: C.secondary, fontSize: 11.5 }}>
-            Tap any planet to read its full meaning
+            {t.tapHint}
           </Text>
           <Pressable
             onPress={() => setShowLegend(!showLegend)}
@@ -77,7 +85,7 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
             }}
           >
             <Text style={{ color: showLegend ? C.gold : C.text, fontSize: 11, fontWeight: "600" }}>
-              {showLegend ? "Hide Glossary" : "? Terms Guide"}
+              {showLegend ? t.glossaryOpen : t.glossaryClosed}
             </Text>
           </Pressable>
         </View>
@@ -95,7 +103,7 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
             }}
           >
             <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
-              PLANETARY TERMS EXPLAINED
+              {t.termsHeading}
             </Text>
             {Object.entries(DIGNITY_GUIDE).map(([term, desc]) => (
               <Text key={term} style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}>
@@ -116,10 +124,10 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
           }}
         >
           <Text style={{ color: C.gold, fontWeight: "700", fontSize: 11.5, width: "28%" }}>
-            PLANET
+            {t.colPlanet}
           </Text>
           <Text style={{ color: C.gold, fontWeight: "700", fontSize: 11.5, width: "52%" }}>
-            D1 SIGN · NAKSHATRA · D9
+            {t.colSign}
           </Text>
           <Text
             style={{
@@ -130,7 +138,7 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
               textAlign: "right",
             }}
           >
-            HOUSE
+            {t.colHouse}
           </Text>
         </View>
 
@@ -205,7 +213,7 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
                         }}
                       >
                         <Text style={{ color: "#BAE6FD", fontSize: 9.5, fontWeight: "700" }}>
-                          Vargottama
+                          {language === "English" ? "Harmonic Strong" : "Vargottama"}
                         </Text>
                       </View>
                     )}
@@ -299,13 +307,17 @@ export function PlanetsTable({ planets }: { planets: Planet[] }) {
                   )}
                   {p.retrograde && (
                     <Text style={{ color: "#F6E7B8", fontSize: 11.5, lineHeight: 17 }}>
-                      <Text style={{ fontWeight: "700" }}>Retrograde (Vakri): </Text>
+                      <Text style={{ fontWeight: "700" }}>
+                        {language === "English" ? "Retrograde: " : "Retrograde (Vakri): "}
+                      </Text>
                       {DIGNITY_GUIDE.Retrograde}
                     </Text>
                   )}
                   {p.vargottama && (
                     <Text style={{ color: "#BAE6FD", fontSize: 11.5, lineHeight: 17 }}>
-                      <Text style={{ fontWeight: "700" }}>Vargottama: </Text>
+                      <Text style={{ fontWeight: "700" }}>
+                        {language === "English" ? "Harmonic Strength: " : "Vargottama: "}
+                      </Text>
                       {DIGNITY_GUIDE.Vargottama}
                     </Text>
                   )}

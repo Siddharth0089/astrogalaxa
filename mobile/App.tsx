@@ -584,6 +584,7 @@ export default function App() {
     body = (
       <KundliScreen
         name={name}
+        language={language}
         birth={birth}
         kundli={kundli}
         kundliLoading={kundliLoading}
@@ -604,6 +605,7 @@ export default function App() {
         setCards={setCards}
         topic={topic}
         setTopic={setTopic}
+        language={language}
         authenticated={Boolean(token)}
         onReading={(value) => {
           setReading(value);
@@ -616,6 +618,7 @@ export default function App() {
     body = (
       <ReadingScreen
         reading={reading}
+        language={language}
         onDrawAgain={() => {
           setCards([]);
           setReading(null);

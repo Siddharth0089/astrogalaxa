@@ -12,15 +12,17 @@ import {
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { Button } from "../components/Button";
-import { Screen, TarotReading } from "../types";
+import { Language, Screen, TarotReading } from "../types";
 import { apiRequest } from "../../session";
 import { C, disclaimer } from "../theme/colors";
+import { getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
 type SpreadMode = "threeCard" | "daily" | "yesNo";
+type TopicKey = "Career" | "Love" | "Health" | "Money" | "General";
 
 type TarotQuota = {
   maxDailyCards: number;
@@ -29,12 +31,28 @@ type TarotQuota = {
   todaysReadingId: string | null;
 };
 
-const QUICK_PROMPTS: Record<string, string> = {
-  Career: "What energy surrounds my career growth?",
-  Love: "What should I understand about love right now?",
-  Health: "What restores my mind and body balance?",
-  Money: "What is shifting in my financial path?",
-  General: "What cosmic message do I need today?",
+const QUICK_PROMPTS_BY_LANG: Record<Language, Record<TopicKey, string>> = {
+  English: {
+    Career: "What energy surrounds my career growth?",
+    Love: "What should I understand about love right now?",
+    Health: "What restores my mind and body balance?",
+    Money: "What is shifting in my financial path?",
+    General: "What cosmic message do I need today?",
+  },
+  Hindi: {
+    Career: "मेरे करियर विकास के बारे में क्या संकेत हैं?",
+    Love: "अभी मेरे प्रेम और रिश्तों के लिए क्या मार्गदर्शन है?",
+    Health: "मेरे स्वास्थ्य और मानसिक शांति के लिए क्या आवश्यक है?",
+    Money: "मेरी आर्थिक स्थिति में क्या बदलाव आ रहा है?",
+    General: "आज मुझे किस ब्रह्मांडीय संदेश पर ध्यान देना चाहिए?",
+  },
+  Hinglish: {
+    Career: "Mere career growth ke baare me kya sanket hai?",
+    Love: "Abhi love aur relationship me kya samajhna zaroori hai?",
+    Health: "Meri health aur inner balance kaise behtar hoga?",
+    Money: "Mere financial path me kya shift aa raha hai?",
+    General: "Aaj mujhe kaunsa cosmic message sunna chahiye?",
+  },
 };
 
 function SparkleIcon({ size = 14, color = C.gold }: { size?: number; color?: string }) {
@@ -90,6 +108,7 @@ export function TarotScreen({
   setCards,
   topic,
   setTopic,
+  language = "English",
   authenticated,
   onReading,
   onNavigate,
@@ -98,10 +117,20 @@ export function TarotScreen({
   setCards: React.Dispatch<React.SetStateAction<string[]>>;
   topic: string;
   setTopic: (t: string) => void;
+  language?: Language;
   authenticated: boolean;
   onReading: (r: TarotReading) => void;
   onNavigate: (s: Screen) => void;
 }) {
+  const t = getCopy(language).tarot;
+  const activePrompts = QUICK_PROMPTS_BY_LANG[language] || QUICK_PROMPTS_BY_LANG.English;
+  const activeTopicKey = (
+    (["Career", "Love", "Health", "Money", "General"].includes(topic)
+      ? topic
+      : "General") as TopicKey
+  );
+  const localizedTopicLabel = t.topics[activeTopicKey] || topic;
+
   const [deck, setDeck] = useState<{ id: string }[]>([]);
   const [quota, setQuota] = useState<TarotQuota | null>(null);
   const [mode, setMode] = useState<SpreadMode>("threeCard");
@@ -352,14 +381,13 @@ export function TarotScreen({
   const slotLabels =
     mode === "threeCard"
       ? [
-          { num: "I", title: "Past" },
-          { num: "II", title: "Present" },
-          { num: "III", title: "Future" },
+          { title: t.slots.past },
+          { title: t.slots.present },
+          { title: t.slots.future },
         ]
       : [
           {
-            num: "I",
-            title: mode === "yesNo" ? "Verdict" : "Soul Guidance",
+            title: mode === "yesNo" ? t.slots.verdict : t.slots.guidance,
           },
         ];
 
@@ -389,17 +417,17 @@ export function TarotScreen({
                 textTransform: "uppercase",
               }}
             >
-              Sacred Tarot · {isFilteredByContext ? `${deck.length} Attuned` : `${deck.length || 78} Arcana`}
+              {t.eyebrow(deck.length || 78, isFilteredByContext, localizedTopicLabel)}
             </Text>
           </View>
           <Text style={s.title}>
-            {viewJournal ? "Reading Journal" : "Tarot Sanctuary"}
+            {viewJournal ? t.titleJournal : t.titleDeck}
           </Text>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={viewJournal ? "Back to sanctuary" : "View Journal"}
+          accessibilityLabel={viewJournal ? t.sanctuaryBtn : t.journalBtn}
           onPress={viewJournal ? () => setViewJournal(false) : loadJournal}
           style={{
             marginTop: 4,
@@ -433,7 +461,7 @@ export function TarotScreen({
               fontWeight: "700",
             }}
           >
-            {viewJournal ? "Sanctuary" : "Journal"}
+            {viewJournal ? t.sanctuaryBtn : t.journalBtn}
           </Text>
         </Pressable>
       </View>
@@ -465,11 +493,11 @@ export function TarotScreen({
               }}
             >
               {quotaExhausted
-                ? `Daily Sacred Allowance Complete (${maxDailyCards}/${maxDailyCards} drawn)`
-                : `${remainingToday} of ${maxDailyCards} Daily Card Pulls Remaining`}
+                ? t.quotaDone(maxDailyCards)
+                : t.quotaLeft(remainingToday, maxDailyCards)}
             </Text>
             <Text style={{ color: C.muted, fontSize: 11 }}>
-              3-Card uses 3 · Daily Draw uses 1 · Yes / No uses 1
+              {t.quotaHint}
             </Text>
           </View>
           <View style={{ flexDirection: "row", gap: 4 }}>
@@ -498,9 +526,7 @@ export function TarotScreen({
       {viewJournal ? (
         /* Illuminated Spiritual Journal History */
         <View style={{ gap: 14 }}>
-          <Text style={s.sub}>
-            Revisit your archived sacred draws, archetypes, and oracle guidance across time.
-          </Text>
+          <Text style={s.sub}>{t.journalSub}</Text>
 
           {journalLoading ? (
             <View
@@ -512,7 +538,7 @@ export function TarotScreen({
                 padding: 20,
               }}
             >
-              <Text style={s.sub}>Opening your sacred archive…</Text>
+              <Text style={s.sub}>{t.journalLoading}</Text>
             </View>
           ) : journal.length === 0 ? (
             <View
@@ -527,11 +553,11 @@ export function TarotScreen({
               }}
             >
               <SparkleIcon size={28} />
-              <Text style={[s.sign, { fontSize: 24 }]}>Your Sanctuary Awaits</Text>
+              <Text style={[s.sign, { fontSize: 24 }]}>{t.emptyTitle}</Text>
               <Text style={[s.helper, { textAlign: "center" }]}>
-                Draw your first reading to preserve personal tarot revelations in your journal.
+                {t.emptyBody}
               </Text>
-              <Button label="Return to Tarot Deck" onPress={() => setViewJournal(false)} />
+              <Button label={t.returnDeckBtn} onPress={() => setViewJournal(false)} />
             </View>
           ) : (
             journal.map((item, idx) => (
@@ -566,11 +592,11 @@ export function TarotScreen({
                       }}
                     >
                       {item.mode === "daily"
-                        ? "Daily Draw"
+                        ? t.modes.daily.label
                         : item.mode === "yesNo"
-                          ? "Yes / No Oracle"
-                          : "3-Card Spread"}{" "}
-                      · {item.topic}
+                          ? t.modes.yesNo.label
+                          : t.modes.threeCard.label}{" "}
+                      · {t.topics[item.topic as TopicKey] || item.topic}
                     </Text>
                   </View>
                   {item.createdAt && (
@@ -646,11 +672,11 @@ export function TarotScreen({
                     textTransform: "uppercase",
                   }}
                 >
-                  Sanctuary Rest · Cycle Complete
+                  {t.exhaustedTitle}
                 </Text>
               </View>
               <Text style={[s.sub, { color: "#EAE3D2", lineHeight: 20 }]}>
-                You have drawn all 3 daily cards today so your intuition stays clear and unclouded. Fresh pulls unlock at midnight.
+                {t.exhaustedBody}
               </Text>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
                 <Pressable
@@ -665,7 +691,7 @@ export function TarotScreen({
                   }}
                 >
                   <Text style={{ color: C.onGold, fontWeight: "700", fontSize: 13 }}>
-                    Open Today&apos;s Journal
+                    {t.openJournalBtn}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -682,14 +708,14 @@ export function TarotScreen({
                   }}
                 >
                   <Text style={{ color: "#F6E7B8", fontWeight: "600", fontSize: 13 }}>
-                    Ask AI Pandit
+                    {t.askAiBtn}
                   </Text>
                 </Pressable>
               </View>
             </View>
           )}
 
-          {/* Modern Cosmic Segmented Spread Selector (Matching KundliScreen) */}
+          {/* Modern Cosmic Segmented Spread Selector */}
           <View
             style={{
               flexDirection: "row",
@@ -703,13 +729,14 @@ export function TarotScreen({
           >
             {(
               [
-                { id: "threeCard" as const, label: "3-Card", cap: "3 cards", need: 3 },
-                { id: "daily" as const, label: "Daily Draw", cap: "1 card", need: 1 },
-                { id: "yesNo" as const, label: "Yes / No", cap: "1 card", need: 1 },
+                { id: "threeCard" as const, need: 3 },
+                { id: "daily" as const, need: 1 },
+                { id: "yesNo" as const, need: 1 },
               ] as const
             ).map((m) => {
               const active = mode === m.id;
               const locked = quota !== null && m.need > remainingToday;
+              const modeCopy = t.modes[m.id];
               return (
                 <Pressable
                   key={m.id}
@@ -719,8 +746,8 @@ export function TarotScreen({
                     if (locked) {
                       setError(
                         remainingToday === 0
-                          ? "Daily 3-card allowance complete for today. Revisit your Journal or consult AI Pandit."
-                          : `Only ${remainingToday} daily card${remainingToday === 1 ? "" : "s"} remaining today — choose Daily Draw or Yes / No.`,
+                          ? t.exhaustedBody
+                          : t.quotaLeft(remainingToday, maxDailyCards),
                       );
                       return;
                     }
@@ -745,7 +772,7 @@ export function TarotScreen({
                       fontSize: 12,
                     }}
                   >
-                    {m.label}
+                    {modeCopy.label}
                   </Text>
                   <Text
                     style={{
@@ -754,7 +781,7 @@ export function TarotScreen({
                       fontWeight: "600",
                     }}
                   >
-                    {m.cap}
+                    {modeCopy.cap}
                   </Text>
                 </Pressable>
               );
@@ -797,21 +824,21 @@ export function TarotScreen({
                       textTransform: "uppercase",
                     }}
                   >
-                    Focus & Intention
+                    {t.intentionHeading}
                   </Text>
                 </View>
                 {!question.trim() ? (
                   <Pressable
-                    onPress={() => setQuestion(QUICK_PROMPTS[topic] || QUICK_PROMPTS.General)}
+                    onPress={() => setQuestion(activePrompts[activeTopicKey] || activePrompts.General)}
                   >
                     <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "600" }}>
-                      + Suggest prompt
+                      {t.suggestPrompt}
                     </Text>
                   </Pressable>
                 ) : (
                   <Pressable onPress={() => setQuestion("")}>
                     <Text style={{ color: C.muted, fontSize: 11, fontWeight: "600" }}>
-                      Clear
+                      {t.clear}
                     </Text>
                   </Pressable>
                 )}
@@ -820,7 +847,7 @@ export function TarotScreen({
               <TextInput
                 value={question}
                 onChangeText={setQuestion}
-                placeholder={QUICK_PROMPTS[topic] || QUICK_PROMPTS.General}
+                placeholder={activePrompts[activeTopicKey] || activePrompts.General}
                 placeholderTextColor="rgba(196, 196, 204, 0.55)"
                 editable={!quotaExhausted}
                 style={{
@@ -849,16 +876,16 @@ export function TarotScreen({
                   textTransform: "uppercase",
                 }}
               >
-                Life Area Resonance
+                {t.topicHeading}
               </Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
-                {["Career", "Love", "Health", "Money", "General"].map((x) => {
+                {(["Career", "Love", "Health", "Money", "General"] as const).map((x) => {
                   const selected = topic === x;
                   return (
                     <Pressable
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
-                      accessibilityLabel={x}
+                      accessibilityLabel={t.topics[x]}
                       onPress={() => {
                         setShowAllCards(false);
                         setTopic(x);
@@ -882,7 +909,7 @@ export function TarotScreen({
                           fontWeight: selected ? "700" : "600",
                         }}
                       >
-                        {x}
+                        {t.topics[x]}
                       </Text>
                     </Pressable>
                   );
@@ -925,7 +952,7 @@ export function TarotScreen({
                         textTransform: "uppercase",
                       }}
                     >
-                      {slot.num} · {slot.title}
+                      {slot.title}
                     </Text>
                     {filled ? (
                       <View
@@ -941,12 +968,12 @@ export function TarotScreen({
                           resizeMode="cover"
                         />
                         <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "700" }}>
-                          Drawn
+                          {t.slots.drawn}
                         </Text>
                       </View>
                     ) : (
                       <Text style={{ color: "rgba(196, 196, 204, 0.65)", fontSize: 11.5 }}>
-                        Select below
+                        {t.slots.selectBelow}
                       </Text>
                     )}
                   </View>
@@ -958,7 +985,7 @@ export function TarotScreen({
           {/* Instant Action / Reveal Banner */}
           {(cards.length === targetCount || busy) && !quotaExhausted && (
             <Button
-              label={busy ? "Turning & Reading Your Cards…" : "✦ Reveal & Flip Prediction"}
+              label={busy ? t.revealBusy : t.revealCta}
               disabled={busy || cards.length !== targetCount}
               onPress={() => void submitReading(cards)}
             />
@@ -985,8 +1012,8 @@ export function TarotScreen({
             >
               <Text style={{ color: C.secondary, fontSize: 12, fontWeight: "600" }}>
                 {isFilteredByContext
-                  ? `${deck.length} ${topic}-Aligned Cards`
-                  : `All ${deck.length} Sacred Cards`}
+                  ? t.attunedLabel(deck.length, localizedTopicLabel)
+                  : t.allDeckLabel(deck.length)}
               </Text>
               {(topic !== "General" || question.trim().length > 0) && (
                 <Pressable
@@ -1002,7 +1029,7 @@ export function TarotScreen({
                   }}
                 >
                   <Text style={{ color: C.gold, fontSize: 10.5, fontWeight: "700" }}>
-                    {showAllCards ? "Attune to Topic" : "View All 78"}
+                    {showAllCards ? t.attuneToggle : t.viewAllToggle}
                   </Text>
                 </Pressable>
               )}
@@ -1010,7 +1037,7 @@ export function TarotScreen({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Shuffle deck"
+              accessibilityLabel={t.shuffle}
               onPress={shuffleDeck}
               disabled={shuffling || loading || deck.length === 0}
               style={{
@@ -1027,7 +1054,7 @@ export function TarotScreen({
             >
               <ShuffleIcon size={13} />
               <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "700" }}>
-                {shuffling ? "Shuffling…" : "Shuffle"}
+                {shuffling ? t.shuffling : t.shuffle}
               </Text>
             </Pressable>
           </View>
@@ -1038,7 +1065,7 @@ export function TarotScreen({
             </Text>
           )}
 
-          {/* Face-Down Card Spread (6-Column Sacred Constellation Grid) */}
+          {/* Face-Down Card Spread */}
           {loading ? (
             <View
               style={{
@@ -1061,7 +1088,7 @@ export function TarotScreen({
                   strokeWidth="1.5"
                 />
               </Svg>
-              <Text style={s.sub}>Consecrating the 78-card deck…</Text>
+              <Text style={s.sub}>{t.loadingDeck}</Text>
             </View>
           ) : deck.length === 0 ? (
             <View
@@ -1078,7 +1105,7 @@ export function TarotScreen({
               <Text style={[s.sub, { textAlign: "center" }]}>
                 {error || "Unable to load the Tarot deck right now."}
               </Text>
-              <Button label="Retry" onPress={() => setRetry((x) => x + 1)} />
+              <Button label={t.retryBtn} onPress={() => setRetry((x) => x + 1)} />
             </View>
           ) : (
             <View
