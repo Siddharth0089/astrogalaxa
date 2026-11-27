@@ -127,14 +127,31 @@ export function ProfileScreen({
     );
 
   return (
-    <ScrollView contentContainerStyle={s.page}>
+    <ScrollView
+      contentContainerStyle={[s.page, { paddingBottom: 32 }]}
+      showsVerticalScrollIndicator={false}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back to Home"
         onPress={onBack}
-        style={s.back}
+        style={{
+          width: 40,
+          height: 40,
+          alignItems: "flex-start",
+          justifyContent: "center",
+        }}
       >
-        <Text style={s.backText}>‹</Text>
+        <Text
+          style={{
+            color: C.text,
+            fontSize: 34,
+            lineHeight: 36,
+            fontWeight: "300",
+          }}
+        >
+          ‹
+        </Text>
       </Pressable>
       <Text style={s.title}>Profile & settings</Text>
       <Text style={s.sub}>{profile.email}</Text>

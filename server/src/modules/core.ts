@@ -26,7 +26,7 @@ import {
 } from "../common/http.js";
 import { nameSign, sunSign } from "../common/signs.js";
 import { computeKundli } from "./kundli-engine.js";
-import { seedHoroscope } from "./horoscope-content.js";
+import { localizeHoroscope, seedHoroscope } from "./horoscope-content.js";
 
 const validTimezone = (zone: string) => {
   try {
@@ -361,7 +361,9 @@ publicRouter.get(
         "HOROSCOPE_UNAVAILABLE",
         "Horoscope is temporarily unavailable",
       );
-    ok(res, h);
+    const preferredLang = u?.language || u?.prefs?.language || "English";
+    const plain = typeof h.toObject === "function" ? h.toObject() : h;
+    ok(res, localizeHoroscope(plain, preferredLang));
   }),
 );
 export const tarotRouter = Router();
@@ -569,6 +571,13 @@ function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
     ? `Latest Tarot Reading (${recentTarot.mode || "spread"} on "${recentTarot.topic}"${recentTarot.question ? `, question: "${recentTarot.question}"` : ""}): ${recentTarot.cards.map((c: any) => `${c.position || "Card"}: ${c.name} (${c.orientation || "upright"})`).join("; ")}. Narrative: "${recentTarot.interpretation || ""}"`
     : "No recent tarot draw on record.";
 
+  const languageRule =
+    preferredLang === "Hindi"
+      ? `2. STRICT LANGUAGE MANDATE: You MUST reply 100% in fluent, authentic HINDI written strictly in DEVANAGARI script (हिन्दी). Do NOT write sentences in English or Hinglish. Greet warmly with "नमस्ते".`
+      : preferredLang === "Hinglish"
+        ? `2. STRICT LANGUAGE MANDATE: You MUST reply in warm, natural conversational HINGLISH (Hindi written using the Roman/English alphabet blended with common Indian English terms, e.g., "Namaste! Aapki kundli ke hisab se..."). Do NOT use Devanagari script or pure formal English.`
+        : `2. STRICT LANGUAGE MANDATE: You MUST reply 100% in clear, fluent ENGLISH ONLY. NEVER use Hindi or Hinglish greetings like "Namaste", "Aap", "Ji", or untranslated Hinglish phrases. Greet warmly with "Hello" or "Greetings", and write in plain eloquent English (translating or briefly clarifying Vedic terms like Ascendant, Moon Sign, or planetary period in English).`;
+
   return `You are Astro Galaxa AI, a wise, compassionate, and deeply knowledgeable Vedic astrologer and spiritual guide.
 You are in a direct one-on-one consultation with the user.
 
@@ -579,19 +588,19 @@ USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 - Birth Date: ${birthDateStr}
 - Birth Time: ${u?.birth?.time || "Not provided"}
 - Birth Place: ${u?.birth?.placeName || "Not provided"}
-- Lagna (Ascendant): ${kundli?.ascendant?.sign || "Unknown"}
-- Chandra Rashi (Moon Sign): ${kundli?.moonSign || "Unknown"}
-- Surya Rashi (Sun Sign): ${u?.sunSign || "Unknown"}
+- Ascendant (Lagna): ${kundli?.ascendant?.sign || "Unknown"}
+- Moon Sign (Chandra Rashi): ${kundli?.moonSign || "Unknown"}
+- Sun Sign (Surya Rashi): ${u?.sunSign || "Unknown"}
 - Nakshatra: ${kundli?.nakshatra?.name || "Unknown"}
-- Current Running Dasha: ${dashaSummary}
+- Active Planetary Period (Dasha): ${dashaSummary}
 - Planetary House Placements: ${planetsSummary}
 - Recent Tarot Draw Context: ${tarotContext}
 
 STRICT PANDIT GUIDELINES:
-1. Always greet the user warmly by their name (${userName}). Address and personalize interpretations respectfully suited for a ${genderStr} seeker.
-2. Language Instruction: Reply strictly in ${preferredLang} (if Hindi, use authentic Hindi in Devanagari script; if Hinglish, write in natural conversational Hinglish using Roman/Latin alphabet as widely spoken across India; if English, respond in fluent, compassionate English).
-3. Do NOT guess or hallucinate any planetary positions: strictly reference the authentic calculated placements and active Dasha provided in the data above.
-4. Directly answer their question using their authentic Vedic placements (mention their relevant house, planetary placement, Moon sign, or current running Dasha when answering). If relevant or asked, weave their recent tarot draw into the guidance.
+1. Always greet the user warmly by their name (${userName}) using ONLY the requested language (${preferredLang}). Address interpretations respectfully for a ${genderStr} seeker.
+${languageRule}
+3. Do NOT guess or hallucinate any planetary positions: strictly reference the authentic calculated placements and active planetary period provided in the data above.
+4. Directly answer their question using their authentic placements (mention relevant house, planetary placement, Moon sign, or active planetary period when answering). If relevant or asked, weave their recent tarot draw into the guidance.
 5. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
 6. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice. Include gentle reminders that astrology provides reflection, not absolute fate.
 7. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
@@ -747,18 +756,28 @@ chatRouter.post(
       });
     }
 
+    const priorMessages = await ChatMessage.find({ threadId: thread._id })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .lean();
+
     await ChatMessage.create({ threadId: thread._id, sender: "user", text });
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const [u, kundli] = await Promise.all([
+    const [u, kundli, recentTarot] = await Promise.all([
       User.findById(req.userId).lean(),
       Kundli.findOne({ userId: req.userId }).lean(),
+      TarotReading.findOne({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
     ]);
 
-    const sysPrompt = buildVedicPrompt(u, kundli);
+    const sysPrompt = buildVedicPrompt(u, kundli, recentTarot);
+    const history = priorMessages.reverse().map((m) => ({
+      role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.text,
+    }));
 
     let fullText = "The celestial alignment suggests quiet contemplation.";
     try {
@@ -773,6 +792,7 @@ chatRouter.post(
             model: env.AI_MODEL,
             messages: [
               { role: "system", content: sysPrompt },
+              ...history,
               { role: "user", content: text },
             ],
             temperature: 0.7,
@@ -787,6 +807,8 @@ chatRouter.post(
         }
       } else if (geminiKey) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        const historyText = history.map((h) => `${h.role === "user" ? "User" : "Pandit"}: ${h.content}`).join("\n");
+        const promptWithHistory = `${sysPrompt}\n\nRecent Conversation:\n${historyText}\nUser: ${text}`;
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -794,7 +816,7 @@ chatRouter.post(
             contents: [
               {
                 role: "user",
-                parts: [{ text: `${sysPrompt}\n\nUser: ${text}` }],
+                parts: [{ text: promptWithHistory }],
               },
             ],
           }),

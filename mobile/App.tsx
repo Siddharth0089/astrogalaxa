@@ -274,6 +274,8 @@ export default function App() {
       await saveSession(d);
       setToken(d.accessToken);
       setName(d.user?.name ?? "");
+      setGender(d.user?.gender ?? "male");
+      setLanguage(d.user?.language ?? "English");
       setNameSign(d.user?.nameSign ?? null);
       setSunSign(d.user?.sunSign ?? null);
       go(d.onboardingComplete ? "home" : "birth");
@@ -409,6 +411,8 @@ export default function App() {
       setReading(null);
       setCards([]);
       setName("");
+      setGender("male");
+      setLanguage("English");
       setNameSign(null);
       setSunSign(null);
       setBirth({ dob: "", time: "", place: "" });
@@ -449,6 +453,8 @@ export default function App() {
     setReading(null);
     setCards([]);
     setName("");
+    setGender("male");
+    setLanguage("English");
     setEmail("");
     setNameSign(null);
     setSunSign(null);
@@ -562,6 +568,7 @@ export default function App() {
     body = (
       <HomeScreen
         name={name}
+        language={language}
         nameSign={nameSign}
         sunSign={sunSign}
         horoscope={horoscope}
@@ -586,7 +593,7 @@ export default function App() {
       />
     );
   else if (screen === "chat")
-    body = <ChatScreen onNavigate={go} name={name} />;
+    body = <ChatScreen onNavigate={go} name={name} language={language} />;
   else if (screen === "live")
     body = <LiveScreen authenticated={Boolean(token)} onNavigate={go} />;
   else if (screen === "tarot")
@@ -626,6 +633,16 @@ export default function App() {
         onSaved={(profile) => {
           setName(profile.name ?? "");
           setNameSign(profile.nameSign ?? null);
+          if (profile.gender) setGender(profile.gender);
+          const nextLang = profile.language || profile.prefs?.language;
+          if (nextLang) setLanguage(nextLang);
+          updateSessionUser({
+            name: profile.name,
+            nameSign: profile.nameSign,
+            gender: profile.gender,
+            language: nextLang,
+          });
+          setHoroscopeRetry((x) => x + 1);
         }}
         onEditBirth={(profile) => {
           if (profile.birth) {
@@ -704,7 +721,14 @@ export default function App() {
             <View style={{ flex: 1 }}>{body}</View>
             {(["home", "kundli", "chat", "live", "tarot"] as Screen[]).includes(
               screen,
-            ) && <BottomNav active={screen} go={go} visible={true} />}
+            ) && (
+              <BottomNav
+                active={screen}
+                go={go}
+                visible={true}
+                language={language}
+              />
+            )}
           </Galaxy>
         </SafeAreaView>
       </SafeAreaProvider>
