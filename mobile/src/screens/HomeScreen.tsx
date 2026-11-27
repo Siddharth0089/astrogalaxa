@@ -6,7 +6,7 @@ import { Horoscope, Language, NameSign, PanchangData, Screen } from "../types";
 import { apiRequest } from "../../session";
 import { C, disclaimer } from "../theme/colors";
 import { PANCHANG_GUIDE } from "../theme/astroGuide";
-import { formatTitleCase, getCopy } from "../theme/i18n";
+import { getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
 export function HomeScreen({
@@ -35,8 +35,6 @@ export function HomeScreen({
   const [panchang, setPanchang] = useState<PanchangData | null>(null);
   const [showPanchangGuide, setShowPanchangGuide] = useState(false);
   const t = getCopy(language);
-  const displayName = formatTitleCase(name);
-  const initial = (displayName || "U").charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!token) return;
@@ -70,13 +68,15 @@ export function HomeScreen({
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Profile"
-          onPress={() => onNavigate("profile")}
+          accessibilityLabel={t.nav.chat}
+          onPress={() => onNavigate("chat")}
           style={{
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: "rgba(243, 197, 86, 0.12)",
+            height: 40,
+            paddingHorizontal: 14,
+            borderRadius: 20,
+            flexDirection: "row",
+            gap: 6,
+            backgroundColor: "rgba(243, 197, 86, 0.14)",
             borderWidth: 1.5,
             borderColor: "rgba(243, 197, 86, 0.65)",
             alignItems: "center",
@@ -88,15 +88,24 @@ export function HomeScreen({
             elevation: 4,
           }}
         >
+          <Svg width={15} height={15} viewBox="0 0 24 24">
+            <Path
+              d="M12 3L14.2 9.8L21 12L14.2 14.2L12 21L9.8 14.2L3 12L9.8 9.8L12 3Z"
+              stroke={C.gold}
+              strokeWidth={1.8}
+              strokeLinejoin="round"
+              fill="rgba(243, 197, 86, 0.28)"
+            />
+          </Svg>
           <Text
             style={{
               color: "#F6E7B8",
               fontWeight: "700",
-              fontSize: 17,
-              letterSpacing: 0.5,
+              fontSize: 13,
+              letterSpacing: 0.3,
             }}
           >
-            {initial}
+            {t.nav.chat}
           </Text>
         </Pressable>
       </View>

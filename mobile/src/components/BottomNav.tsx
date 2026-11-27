@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import Svg, { Path, Rect } from "react-native-svg";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { Language, Screen } from "../types";
 import { C } from "../theme/colors";
 import { getCopy } from "../theme/i18n";
@@ -9,7 +9,7 @@ function NavIcon({
   tab,
   active,
 }: {
-  tab: "home" | "kundli" | "chat" | "tarot";
+  tab: "home" | "kundli" | "tarot" | "profile";
   active: boolean;
 }) {
   const color = active ? C.gold : C.secondary;
@@ -44,15 +44,6 @@ function NavIcon({
           />
         </>
       )}
-      {tab === "chat" && (
-        <Path
-          d="M12 3L14.2 9.8L21 12L14.2 14.2L12 21L9.8 14.2L3 12L9.8 9.8L12 3Z"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinejoin="round"
-          fill={active ? "rgba(243, 197, 86, 0.2)" : "none"}
-        />
-      )}
       {tab === "tarot" && (
         <>
           <Rect
@@ -74,6 +65,25 @@ function NavIcon({
           />
         </>
       )}
+      {tab === "profile" && (
+        <>
+          <Circle
+            cx="12"
+            cy="8.5"
+            r="3.5"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            fill={active ? "rgba(243, 197, 86, 0.16)" : "none"}
+          />
+          <Path
+            d="M5 19.5C5 16.2 8.1 14 12 14C15.9 14 19 16.2 19 19.5"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            fill={active ? "rgba(243, 197, 86, 0.12)" : "none"}
+          />
+        </>
+      )}
     </Svg>
   );
 }
@@ -92,11 +102,11 @@ export function BottomNav({
   if (!visible) return null;
   const t = getCopy(language);
 
-  const items: { label: string; value: "home" | "kundli" | "chat" | "tarot" }[] = [
+  const items: { label: string; value: "home" | "kundli" | "tarot" | "profile" }[] = [
     { label: t.nav.home, value: "home" },
     { label: t.nav.kundli, value: "kundli" },
-    { label: t.nav.chat, value: "chat" },
     { label: t.nav.tarot, value: "tarot" },
+    { label: t.nav.profile, value: "profile" },
   ];
 
   return (
@@ -132,7 +142,7 @@ export function BottomNav({
         {items.map((item) => {
           const isSelected =
             active === item.value ||
-            (active === "live" && item.value === "chat");
+            (item.value === "tarot" && active === "reading");
 
           return (
             <Pressable
@@ -159,7 +169,6 @@ export function BottomNav({
                   fontSize: 10.5,
                   color: isSelected ? C.gold : C.secondary,
                   fontWeight: isSelected ? "700" : "500",
-                  letterSpacing: 0.3,
                 }}
               >
                 {item.label}

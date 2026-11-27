@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 import { Button } from "../components/Button";
 import { Language, Screen, TarotReading } from "../types";
 import { apiRequest } from "../../session";
@@ -20,7 +21,7 @@ import { s } from "../theme/styles";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
-type SpreadMode = "daily" | "threeCard" | "yesNo";
+type SpreadMode = "threeCard" | "daily" | "yesNo";
 type TopicKey = "Career" | "Love" | "Health" | "Money" | "General";
 
 type ModeQuota = {
@@ -211,7 +212,6 @@ export function TarotScreen({
     }
   };
 
-  // Initial deck + quota load
   useEffect(() => {
     mounted.current = true;
     setCards([]);
@@ -257,7 +257,6 @@ export function TarotScreen({
     };
   }, [authenticated, retry, setCards]);
 
-  // Live filter deck in-place when Life Area or Question changes (no full-screen reload)
   useEffect(() => {
     if (!authenticated || !initialLoaded.current) return;
     const handle = setTimeout(() => {
@@ -390,18 +389,15 @@ export function TarotScreen({
       autoRevealTimer.current = null;
     }
 
-    let next: string[];
     if (cards.includes(id)) {
-      next = cards.filter((x) => x !== id);
-      setCards(next);
+      setCards(cards.filter((x) => x !== id));
       return;
     }
     if (cards.length >= targetCount) return;
 
-    next = [...cards, id];
+    const next = [...cards, id];
     setCards(next);
 
-    // Automatically open flip reveal & prediction as soon as the final needed card is picked
     if (next.length === targetCount) {
       autoRevealTimer.current = setTimeout(() => {
         void submitReading(next);
@@ -412,22 +408,22 @@ export function TarotScreen({
   const slotLabels =
     mode === "threeCard"
       ? [
-        { title: t.slots.past },
-        { title: t.slots.present },
-        { title: t.slots.future },
-      ]
+          { title: t.slots.past },
+          { title: t.slots.present },
+          { title: t.slots.future },
+        ]
       : [
-        {
-          title: mode === "yesNo" ? t.slots.verdict : t.slots.guidance,
-        },
-      ];
+          {
+            title: mode === "yesNo" ? t.slots.verdict : t.slots.guidance,
+          },
+        ];
 
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 110, gap: 16 }]}
+      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 112, gap: 16 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Spiritual Editorial Header (No App Bar or Back Button) */}
+      {/* Sacred Editorial Header (No App Bar or Back Button) */}
       <View
         style={{
           flexDirection: "row",
@@ -454,40 +450,6 @@ export function TarotScreen({
           <Text style={s.title}>
             {viewJournal ? t.titleJournal : t.titleDeck}
           </Text>
-          {quota && !viewJournal && (
-            <View style={{ gap: 4, marginTop: 4 }}>
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: quotaExhausted
-                    ? "rgba(255, 180, 171, 0.35)"
-                    : "rgba(243, 197, 86, 0.35)",
-                  backgroundColor: quotaExhausted
-                    ? "rgba(255, 180, 171, 0.1)"
-                    : "rgba(243, 197, 86, 0.1)",
-                }}
-              >
-                <Text
-                  style={{
-                    color: quotaExhausted ? "#FFB4AB" : "#F6E7B8",
-                    fontSize: 11,
-                    fontWeight: "700",
-                  }}
-                >
-                  {quotaExhausted
-                    ? `0 of ${maxDailyCards} daily cards left today`
-                    : `${remainingToday} of ${maxDailyCards} daily cards left today`}
-                </Text>
-              </View>
-              <Text style={{ color: C.muted, fontSize: 11 }}>
-                Shared daily allowance: 3-Card (3) · Daily Draw (1 each) · Yes/No (1 each)
-              </Text>
-            </View>
-          )}
         </View>
 
         <Pressable
@@ -496,17 +458,32 @@ export function TarotScreen({
           onPress={viewJournal ? () => setViewJournal(false) : loadJournal}
           style={{
             marginTop: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
             paddingHorizontal: 14,
-            paddingVertical: 8,
-            borderRadius: 12,
+            paddingVertical: 9,
+            borderRadius: 14,
             borderWidth: 1,
-            borderColor: viewJournal ? C.gold : C.border,
-            backgroundColor: viewJournal ? "rgba(243, 197, 86, 0.16)" : C.glass,
+            borderColor: viewJournal ? C.gold : "rgba(243, 197, 86, 0.28)",
+            backgroundColor: viewJournal
+              ? "rgba(243, 197, 86, 0.16)"
+              : "rgba(18, 16, 28, 0.85)",
           }}
         >
+          <Svg width={13} height={13} viewBox="0 0 24 24">
+            <Path
+              d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+              fill="none"
+              stroke={viewJournal ? C.gold : "#F6E7B8"}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
           <Text
             style={{
-              color: viewJournal ? C.gold : C.text,
+              color: viewJournal ? C.gold : "#F6E7B8",
               fontSize: 12,
               fontWeight: "700",
             }}
@@ -578,7 +555,7 @@ export function TarotScreen({
       )}
 
       {viewJournal ? (
-        /* Reading Journal History */
+        /* Illuminated Spiritual Journal History */
         <View style={{ gap: 14 }}>
           <Text style={s.sub}>{t.journalSub}</Text>
 
@@ -618,7 +595,14 @@ export function TarotScreen({
               <Pressable
                 key={item._id || String(idx)}
                 onPress={() => onReading({ ...item, fromJournal: true })}
-                style={[s.card, { gap: 8, padding: 16 }]}
+                style={{
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: "rgba(243, 197, 86, 0.26)",
+                  backgroundColor: "rgba(18, 16, 28, 0.82)",
+                  padding: 18,
+                  gap: 10,
+                }}
               >
                 <View
                   style={{
@@ -652,23 +636,34 @@ export function TarotScreen({
                     </Text>
                   )}
                 </View>
-                {item.question && (
-                  <Text style={{ color: "#E0D7C6", fontStyle: "italic", fontSize: 13 }}>
+
+                {item.question ? (
+                  <Text
+                    style={{
+                      color: "#F7F3EA",
+                      fontStyle: "italic",
+                      fontSize: 14,
+                      lineHeight: 20,
+                    }}
+                  >
                     &ldquo;{item.question}&rdquo;
                   </Text>
-                )}
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                ) : null}
+
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {item.cards?.map((c) => (
                     <View
                       key={c.name + c.position}
                       style={{
-                        backgroundColor: "rgba(255,255,255,0.06)",
-                        paddingHorizontal: 8,
+                        backgroundColor: "rgba(243, 197, 86, 0.08)",
+                        borderWidth: 1,
+                        borderColor: "rgba(243, 197, 86, 0.2)",
+                        paddingHorizontal: 9,
                         paddingVertical: 4,
-                        borderRadius: 8,
+                        borderRadius: 9,
                       }}
                     >
-                      <Text style={{ color: C.text, fontSize: 11 }}>
+                      <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "600" }}>
                         {c.name} {c.orientation === "reversed" ? "↺" : "↑"}
                       </Text>
                     </View>
@@ -734,17 +729,9 @@ export function TarotScreen({
                   </Text>
                   <Text
                     style={{
-                      flex: 1,
-                      paddingVertical: 8,
-                      paddingHorizontal: 6,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 2,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: isSelected ? C.gold : C.border,
-                      backgroundColor: isSelected ? C.gold : C.glass,
-                      opacity: locked ? 0.45 : 1,
+                      color: active ? C.onGold : C.muted,
+                      fontSize: 10,
+                      fontWeight: "600",
                     }}
                   >
                     {doneForMode
@@ -957,9 +944,14 @@ export function TarotScreen({
                       }}
                       key={x}
                       style={{
-                        color: isSelected ? C.onGold : C.text,
-                        fontWeight: isSelected ? "700" : "600",
-                        fontSize: 12,
+                        paddingHorizontal: 13,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: selected ? C.gold : "rgba(255, 255, 255, 0.14)",
+                        backgroundColor: selected
+                          ? C.gold
+                          : "rgba(255, 255, 255, 0.04)",
                       }}
                     >
                       <Text
@@ -1005,9 +997,11 @@ export function TarotScreen({
                   >
                     <Text
                       style={{
-                        color: isSelected ? C.onGold : C.muted,
+                        color: filled ? C.gold : C.muted,
                         fontSize: 10,
-                        fontWeight: "600",
+                        fontWeight: "700",
+                        letterSpacing: 1.2,
+                        textTransform: "uppercase",
                       }}
                     >
                       {slot.title}
@@ -1040,73 +1034,7 @@ export function TarotScreen({
             </View>
           </View>
 
-          {/* Optional Question Input */}
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Your Question (optional)</Text>
-            <TextInput
-              value={question}
-              onChangeText={setQuestion}
-              placeholder="e.g. Will I get my promotion or new love soon?"
-              placeholderTextColor={C.muted}
-              editable={!quotaExhausted}
-              style={{
-                backgroundColor: C.glass,
-                borderWidth: 1,
-                borderColor: C.border,
-                borderRadius: 14,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                color: C.text,
-                fontSize: 14,
-              }}
-            />
-          </View>
-
-          {/* Life Area / Topic Chips */}
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Life Area (filters relevant cards)</Text>
-            <View style={s.chips}>
-              {["Career", "Love", "Health", "Money", "General"].map((x) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: topic === x }}
-                  accessibilityLabel={x}
-                  onPress={() => {
-                    setShowAllCards(false);
-                    setTopic(x);
-                  }}
-                  key={x}
-                >
-                  <Text style={[s.chip, topic === x && s.chipActive]}>{x}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Selection Slots */}
-          <View style={s.slots}>
-            {(mode === "threeCard"
-              ? ["Past", "Present", "Future"]
-              : [mode === "yesNo" ? "Verdict" : "Daily Guidance"]
-            ).map((x, i) => (
-              <View style={s.slot} key={x}>
-                <Text style={s.sub}>{x}</Text>
-                <Text
-                  style={[
-                    s.cardText,
-                    {
-                      color: cards[i] !== undefined ? C.gold : C.muted,
-                      fontWeight: cards[i] !== undefined ? "700" : "400",
-                    },
-                  ]}
-                >
-                  {cards[i] === undefined ? "Pick a card" : "✓ Ready to flip"}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Instant Action / Reveal Banner (Right above the deck so user never needs to scroll past cards) */}
+          {/* Instant Action / Reveal Banner */}
           {(cards.length === targetCount || busy) && !modeExhausted && (
             <Button
               label={busy ? t.revealBusy : t.revealCta}
@@ -1261,7 +1189,6 @@ export function TarotScreen({
                   const isSelected = selectionOrder !== -1;
                   const direction = i % 2 === 0 ? 1 : -1;
 
-                  // Natural graceful crescent curve across neighbors in the fan
                   const wavePhase = (i % 7) - 3;
                   const idleTiltDeg = isSelected ? 0 : wavePhase * 2.1;
                   const idleArcY = isSelected ? -18 : Math.abs(wavePhase) * 3.5;

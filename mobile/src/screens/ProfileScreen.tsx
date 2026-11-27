@@ -148,7 +148,7 @@ export function ProfileScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingBottom: 32 }]}
+      contentContainerStyle={[s.page, { paddingBottom: 104 }]}
       showsVerticalScrollIndicator={false}
     >
       <Pressable

@@ -30,6 +30,7 @@ export function getCopy(language: Language = "English") {
         kundli: "कुंडली",
         chat: "चैट",
         tarot: "टैरो",
+        profile: "प्रोफ़ाइल",
       },
       chatWelcome: (name?: string) =>
         `नमस्ते${name ? `, ${formatTitleCase(name)}` : ""}! मैं Astro Galaxa AI हूँ। आपकी जन्म कुंडली, ग्रह स्थिति और दशा विवरण तैयार हैं। अपने करियर, विवाह, स्वास्थ्य या जीवन पथ के बारे में कुछ भी पूछें।`,
@@ -270,6 +271,7 @@ export function getCopy(language: Language = "English") {
         kundli: "Kundli",
         chat: "Chat",
         tarot: "Tarot",
+        profile: "Profile",
       },
       chatWelcome: (name?: string) =>
         `Namaste${name ? `, ${formatTitleCase(name)}` : ""}! Main Astro Galaxa AI hoon. Aapki Vedic birth chart, grah sthiti aur Dasha timeline mere paas ready hai. Apne career, shaadi timing, health ya personal path ke baare mein kuch bhi poochhein.`,
@@ -509,6 +511,7 @@ export function getCopy(language: Language = "English") {
       kundli: "Kundli",
       chat: "Chat",
       tarot: "Tarot",
+      profile: "Profile",
     },
     chatWelcome: (name?: string) =>
       `Hello${name ? `, ${formatTitleCase(name)}` : ""}! I am Astro Galaxa AI. Your natal birth chart, planetary placements, and life cycle timeline are ready. Ask me anything about your career, relationships, health, or personal path.`,

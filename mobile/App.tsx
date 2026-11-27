@@ -723,7 +723,7 @@ export default function App() {
               </View>
             )}
             <View style={{ flex: 1 }}>{body}</View>
-            {(["home", "kundli", "chat", "live", "tarot"] as Screen[]).includes(
+            {(["home", "kundli", "chat", "live", "tarot", "profile"] as Screen[]).includes(
               screen,
             ) && (
               <BottomNav
