@@ -17,7 +17,7 @@ export function ChatScreen({
   const [messages, setMessages] = useState([
     {
       who: "ai",
-      text: `Namaste${name ? `, ${name}` : ""}! I am Astro Galexa AI. I have your Vedic birth chart, planetary placements, and dasha timeline ready. Ask me about your career, marriage timing, health, or personal path.`,
+      text: `Namaste${name ? `, ${name}` : ""}! I am Astro Galaxa AI. I have your Vedic birth chart, planetary placements, and dasha timeline ready. Ask me about your career, marriage timing, health, or personal path.`,
     },
   ]);
 
@@ -78,7 +78,7 @@ export function ChatScreen({
         <View style={s.back} />
       </View>
       <View style={s.aiHeader}>
-        <Text style={s.cardTitle}>ASTRO GALEXA AI</Text>
+        <Text style={s.cardTitle}>ASTRO GALAXA AI</Text>
         <Text style={s.sub}>Personalized Vedic Intelligence</Text>
       </View>
       <FlatList

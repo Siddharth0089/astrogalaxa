@@ -81,15 +81,27 @@ export type Planet = {
 };
 
 export type TarotReading = {
+  _id?: string;
+  mode?: "daily" | "threeCard" | "yesNo";
   topic: string;
+  question?: string | null;
   cards: {
     cardId: string;
     position: string;
     name: string;
     numeral: string;
+    suit?: string;
     artKey: string;
+    orientation?: "upright" | "reversed";
+    keywords?: string[];
     meaning: string;
+    love?: string;
+    career?: string;
+    advice?: string;
+    yesNo?: string;
   }[];
+  interpretation?: string;
+  createdAt?: string;
 };
 
 export type Horoscope = {

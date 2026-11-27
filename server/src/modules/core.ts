@@ -221,7 +221,7 @@ kundliRouter.get(
       timezone: birth.timezone,
     })).digest("hex");
 
-    if (existing && existing.birthHash === currentHash && existing.computedAt && (Date.now() - new Date(existing.computedAt).getTime() < 86_400_000)) {
+    if (existing && existing.birthHash === currentHash) {
       return ok(res, existing);
     }
     const k = await Kundli.findOneAndUpdate(
@@ -386,12 +386,25 @@ tarotRouter.get(
     );
   }),
 );
+tarotRouter.get(
+  "/readings",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const readings = await TarotReading.find({ userId: req.userId })
+      .sort({ createdAt: -1 })
+      .limit(30)
+      .lean();
+    ok(res, readings);
+  }),
+);
 tarotRouter.post(
   "/readings",
   asyncRoute(async (req: AuthRequest, res) => {
-    const { topic, cardIds } = z
+    const { topic, cardIds, mode = "threeCard", question, orientations = [] } = z
       .object({
-        topic: z.enum(["Career", "Love", "Health", "Money", "General"]),
+        topic: z.enum(["Career", "Love", "Health", "Money", "General"]).default("General"),
+        mode: z.enum(["daily", "threeCard", "yesNo"]).optional(),
+        question: z.string().trim().max(500).optional(),
+        orientations: z.array(z.enum(["upright", "reversed"])).optional(),
         cardIds: z
           .array(
             z
@@ -399,34 +412,99 @@ tarotRouter.post(
               .regex(/^[a-f\d]{24}$/i)
               .transform((id) => id.toLowerCase()),
           )
-          .length(3)
+          .min(1)
+          .max(3)
           .refine(
-            (ids) => new Set(ids).size === 3,
-            "Choose three different cards",
+            (ids) => new Set(ids).size === ids.length,
+            "Choose different cards",
           ),
       })
       .parse(req.body);
     const cards = await TarotCard.find({ _id: { $in: cardIds } });
-    if (cards.length !== 3)
-      throw new AppError(400, "INVALID_CARDS", "Choose three valid cards");
-    const positions = ["Past", "Present", "Future"];
+    if (cards.length !== cardIds.length)
+      throw new AppError(400, "INVALID_CARDS", "Choose valid cards");
+    const defaultMode = mode || (cardIds.length === 1 ? "daily" : "threeCard");
+    const positions =
+      cardIds.length === 1
+        ? ["Focus"]
+        : defaultMode === "yesNo"
+          ? ["Influence", "Obstacle", "Outcome"]
+          : ["Past", "Present", "Future"];
     const byId = new Map(cards.map((card) => [card.id, card]));
+    const drawnCards = cardIds.map((id, i) => {
+      const c = byId.get(id)!;
+      const orient = orientations[i] || "upright";
+      const isRev = orient === "reversed";
+      const posKey = (positions[i] || "").toLowerCase();
+      return {
+        cardId: c.id,
+        position: positions[i] || `Card ${i + 1}`,
+        name: c.name,
+        numeral: c.numeral,
+        suit: c.suit || "Major",
+        artKey: c.artKey,
+        orientation: orient,
+        keywords: c.keywords,
+        meaning: isRev
+          ? (c.meanings?.reversed || c.meanings?.upright || c.meanings?.[posKey])
+          : (c.meanings?.upright || c.meanings?.[posKey]),
+        past: c.meanings?.past,
+        present: c.meanings?.present,
+        future: c.meanings?.future,
+        love: c.meanings?.love,
+        career: c.meanings?.career,
+        advice: c.meanings?.advice,
+        yesNo: c.meanings?.yesNo,
+      };
+    });
+
+    let interpretation = drawnCards
+      .map((c) => `${c.position}: ${c.name} (${c.orientation}) - ${c.meaning}`)
+      .join(" ");
+
+    const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
+    if (groqOrOpenAiKey) {
+      try {
+        const prompt = `You are an intuitive, insightful Tarot reader for Astro Galaxa.
+Spread Mode: ${defaultMode}
+Topic: ${topic}
+${question ? `Question: "${question}"` : ""}
+Cards Drawn:
+${drawnCards.map((c) => `- ${c.position}: ${c.name} (${c.orientation}). Meaning: ${c.meaning}`).join("\n")}
+
+Synthesize a cohesive 2-paragraph narrative reading interpreting these cards together. Provide inspiring, actionable guidance. Avoid fatalistic predictions or medical/legal advice.`;
+
+        const resp = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqOrOpenAiKey}`,
+          },
+          body: JSON.stringify({
+            model: env.AI_MODEL,
+            messages: [
+              { role: "system", content: "You are a warm, empowering Tarot reader." },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.7,
+            max_tokens: 450,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (resp.ok) {
+          const d = await resp.json();
+          interpretation = d.choices?.[0]?.message?.content || interpretation;
+        }
+      } catch {}
+    }
+
     const reading = await TarotReading.create({
       userId: req.userId,
+      mode: defaultMode,
       topic,
-      cards: cardIds.map((id, i) => {
-        const c = byId.get(id)!;
-        return {
-          cardId: c.id,
-          position: positions[i],
-          name: c.name,
-          numeral: c.numeral,
-          artKey: c.artKey,
-          meaning: c.meanings?.[positions[i].toLowerCase()],
-        };
-      }),
-      interpretation:
-        "Reflect on these symbols as gentle prompts, not predictions.",
+      question: question ?? null,
+      cards: drawnCards,
+      interpretation,
     });
     ok(res, reading, 201);
   }),
@@ -473,7 +551,7 @@ chatRouter.get(
   }),
 );
 
-function buildVedicPrompt(u: any, kundli: any) {
+function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
   const userName = u?.name?.trim() || "Seeker";
   const genderStr = u?.gender ? u.gender.charAt(0).toUpperCase() + u.gender.slice(1) : "Not specified";
   const preferredLang = u?.language || u?.prefs?.language || "English";
@@ -487,10 +565,14 @@ function buildVedicPrompt(u: any, kundli: any) {
 
   const birthDateStr = u?.birth?.dob ? new Date(u.birth.dob).toISOString().split("T")[0] : "Unknown";
 
-  return `You are Astro Galaxa AI, a wise, compassionate, and deeply knowledgeable Vedic astrologer.
+  const tarotContext = recentTarot?.cards?.length
+    ? `Latest Tarot Reading (${recentTarot.mode || "spread"} on "${recentTarot.topic}"${recentTarot.question ? `, question: "${recentTarot.question}"` : ""}): ${recentTarot.cards.map((c: any) => `${c.position || "Card"}: ${c.name} (${c.orientation || "upright"})`).join("; ")}. Narrative: "${recentTarot.interpretation || ""}"`
+    : "No recent tarot draw on record.";
+
+  return `You are Astro Galaxa AI, a wise, compassionate, and deeply knowledgeable Vedic astrologer and spiritual guide.
 You are in a direct one-on-one consultation with the user.
 
-USER PROFILE & ASTROLOGICAL DATA:
+USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 - Full Name: ${userName}
 - Gender: ${genderStr}
 - Preferred Language: ${preferredLang}
@@ -503,14 +585,16 @@ USER PROFILE & ASTROLOGICAL DATA:
 - Nakshatra: ${kundli?.nakshatra?.name || "Unknown"}
 - Current Running Dasha: ${dashaSummary}
 - Planetary House Placements: ${planetsSummary}
+- Recent Tarot Draw Context: ${tarotContext}
 
-RESPONSE GUIDELINES:
+STRICT PANDIT GUIDELINES:
 1. Always greet the user warmly by their name (${userName}). Address and personalize interpretations respectfully suited for a ${genderStr} seeker.
 2. Language Instruction: Reply strictly in ${preferredLang} (if Hindi, use authentic Hindi in Devanagari script; if Hinglish, write in natural conversational Hinglish using Roman/Latin alphabet as widely spoken across India; if English, respond in fluent, compassionate English).
-3. Directly answer their question using their authentic Vedic placements (mention their relevant house, planetary placement, Moon sign, or current running Dasha when answering).
-4. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
-5. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice.
-6. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
+3. Do NOT guess or hallucinate any planetary positions: strictly reference the authentic calculated placements and active Dasha provided in the data above.
+4. Directly answer their question using their authentic Vedic placements (mention their relevant house, planetary placement, Moon sign, or current running Dasha when answering). If relevant or asked, weave their recent tarot draw into the guidance.
+5. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
+6. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice. Include gentle reminders that astrology provides reflection, not absolute fate.
+7. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
 }
 
 chatRouter.post(
@@ -547,14 +631,27 @@ chatRouter.post(
       });
     }
 
+    // Fetch prior messages before saving current user message for context
+    const priorMessages = await ChatMessage.find({ threadId: thread._id })
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .lean();
+
     await ChatMessage.create({ threadId: thread._id, sender: "user", text });
 
-    const [u, kundli] = await Promise.all([
+    const [u, kundli, recentTarot] = await Promise.all([
       User.findById(req.userId).lean(),
       Kundli.findOne({ userId: req.userId }).lean(),
+      TarotReading.findOne({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
     ]);
 
-    const sysPrompt = buildVedicPrompt(u, kundli);
+    const sysPrompt = buildVedicPrompt(u, kundli, recentTarot);
+
+    // Build multi-turn conversational history in chronological order
+    const history = priorMessages.reverse().map((m) => ({
+      role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.text,
+    }));
 
     let aiText = "The celestial bodies invite patience and clarity today.";
     try {
@@ -569,6 +666,7 @@ chatRouter.post(
             model: env.AI_MODEL,
             messages: [
               { role: "system", content: sysPrompt },
+              ...history,
               { role: "user", content: text },
             ],
             temperature: 0.7,
@@ -582,6 +680,8 @@ chatRouter.post(
         }
       } else if (geminiKey) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        const historyText = history.map((h) => `${h.role === "user" ? "User" : "Pandit"}: ${h.content}`).join("\n");
+        const promptWithHistory = `${sysPrompt}\n\nRecent Conversation:\n${historyText}\nUser: ${text}`;
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -589,7 +689,7 @@ chatRouter.post(
             contents: [
               {
                 role: "user",
-                parts: [{ text: `${sysPrompt}\n\nUser: ${text}` }],
+                parts: [{ text: promptWithHistory }],
               },
             ],
           }),
