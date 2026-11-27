@@ -76,7 +76,7 @@ export function ChatScreen({
   };
 
   return (
-    <View style={s.chatPage}>
+    <View style={[s.chatPage, { paddingBottom: 86 }]}>
       <View style={s.header}>
         <Pressable
           accessibilityLabel="Go back"

@@ -630,3 +630,261 @@ export function computeKundli(userId: string, birth: Birth, now = new Date()) {
     computedAt: now,
   };
 }
+
+const TITHI_NAMES = [
+  "Pratipada", "Dwitiya", "Tritiya", "Chaturthi", "Panchami",
+  "Shashthi", "Saptami", "Ashtami", "Navami", "Dashami",
+  "Ekadashi", "Dwadashi", "Trayodashi", "Chaturdashi", "Purnima",
+];
+
+const VEDIC_YOGAS = [
+  "Vishkambha", "Priti", "Ayushman", "Saubhagya", "Shobhana",
+  "Atiganda", "Sukarma", "Dhriti", "Shoola", "Ganda",
+  "Vriddhi", "Dhruva", "Vyaghata", "Harshana", "Vajra",
+  "Siddhi", "Vyatipata", "Variyan", "Parigha", "Shiva",
+  "Siddha", "Sadhya", "Shubha", "Shukla", "Brahma",
+  "Indra", "Vaidhriti",
+];
+
+const MOVABLE_KARANAS = [
+  "Bava", "Balava", "Kaulava", "Taitila", "Gara", "Vanija", "Vishti (Bhadra)",
+];
+
+const VARA_NAMES = [
+  "Sunday · Ravivara",
+  "Monday · Somavara",
+  "Tuesday · Mangalavara",
+  "Wednesday · Budhavara",
+  "Thursday · Guruvara",
+  "Friday · Shukravara",
+  "Saturday · Shanivara",
+];
+
+const RAHU_KAAL_BY_DAY = [
+  "04:30 PM – 06:00 PM",
+  "07:30 AM – 09:00 AM",
+  "03:00 PM – 04:30 PM",
+  "12:00 PM – 01:30 PM",
+  "01:30 PM – 03:00 PM",
+  "10:30 AM – 12:00 PM",
+  "09:00 AM – 10:30 AM",
+];
+
+export function computePanchang(timezone = "Asia/Kolkata", now = new Date()) {
+  let local = DateTime.fromJSDate(now, { zone: timezone });
+  if (!local.isValid) local = DateTime.fromJSDate(now, { zone: "UTC" });
+  const utc = local.toUTC();
+  const julian = sweph.julday(
+    utc.year,
+    utc.month,
+    utc.day,
+    utc.hour + utc.minute / 60 + utc.second / 3600,
+    sweph.constants.SE_GREG_CAL,
+  );
+  sweph.set_sid_mode(sweph.constants.SE_SIDM_LAHIRI, 0, 0);
+  const flags =
+    sweph.constants.SEFLG_MOSEPH |
+    sweph.constants.SEFLG_SIDEREAL |
+    sweph.constants.SEFLG_SPEED;
+
+  const sunLon = normalized(sweph.calc_ut(julian, sweph.constants.SE_SUN, flags).data[0]);
+  const moonLon = normalized(sweph.calc_ut(julian, sweph.constants.SE_MOON, flags).data[0]);
+
+  const diff = normalized(moonLon - sunLon);
+  const tithiIdx = Math.floor(diff / 12); // 0..29
+  const paksha = tithiIdx < 15 ? "Shukla Paksha" : "Krishna Paksha";
+  const tithi =
+    tithiIdx === 29
+      ? "Amavasya"
+      : tithiIdx === 14
+        ? "Purnima"
+        : TITHI_NAMES[tithiIdx % 15];
+
+  const moonStar = nakshatra(moonLon);
+  const yogaIdx = Math.floor(normalized(sunLon + moonLon) / (360 / 27));
+  const yoga = VEDIC_YOGAS[yogaIdx % 27];
+
+  const karanaStep = Math.floor(diff / 6); // 0..59
+  const karana =
+    karanaStep === 0
+      ? "Kimstughna"
+      : karanaStep === 57
+        ? "Shakuni"
+        : karanaStep === 58
+          ? "Chatushpada"
+          : karanaStep === 59
+            ? "Naga"
+            : MOVABLE_KARANAS[(karanaStep - 1) % 7];
+
+  const dayIdx = local.weekday % 7; // 0 = Sun .. 6 = Sat
+  return {
+    date: local.toISODate(),
+    timezone: local.zoneName,
+    vara: VARA_NAMES[dayIdx],
+    tithi,
+    paksha,
+    nakshatra: moonStar,
+    yoga,
+    karana,
+    sunSign: rashis[Math.floor(sunLon / 30)].name,
+    moonSign: rashis[Math.floor(moonLon / 30)].name,
+    rahuKaal: RAHU_KAAL_BY_DAY[dayIdx],
+    abhijitMuhurat: dayIdx === 3 ? "Neutral on Wednesday" : "11:45 AM – 12:33 PM",
+  };
+}
+
+// Gun Milan (Ashtakoota 36-point Compatibility Tables)
+const VARNA_RANK = [3, 2, 1, 4, 3, 2, 1, 4, 3, 2, 1, 4]; // 4=Brahmin, 3=Kshatriya, 2=Vaishya, 1=Shudra
+// Vashya groups: 0=Chatushpada, 1=Manav, 2=Jalachara, 3=Vanachara, 4=Keeta
+const VASHYA_GROUP = [0, 0, 1, 2, 3, 1, 1, 4, 0, 2, 1, 2];
+// 0..13 Animal IDs for 27 Nakshatras
+const YONI_ID = [
+  0, 1, 2, 3, 3, 4, 5, 2, 5, 6, 6, 7, 8, 9,
+  8, 9, 10, 10, 4, 11, 12, 11, 13, 0, 13, 7, 1,
+];
+const YONI_ENEMIES: Record<number, number> = {
+  0: 8, 8: 0, 1: 13, 13: 1, 2: 11, 11: 2,
+  3: 12, 12: 3, 4: 10, 10: 4, 5: 6, 6: 5, 7: 9, 9: 7,
+};
+// Classical natural friendship: 2=Friend, 1=Neutral, 0=Enemy
+const PLANET_FRIENDS: Record<string, Record<string, number>> = {
+  Sun:     { Sun: 2, Moon: 2, Mars: 2, Mercury: 1, Jupiter: 2, Venus: 0, Saturn: 0 },
+  Moon:    { Sun: 2, Moon: 2, Mars: 1, Mercury: 2, Jupiter: 1, Venus: 1, Saturn: 1 },
+  Mars:    { Sun: 2, Moon: 2, Mars: 2, Mercury: 0, Jupiter: 2, Venus: 1, Saturn: 1 },
+  Mercury: { Sun: 2, Moon: 0, Mars: 1, Mercury: 2, Jupiter: 1, Venus: 2, Saturn: 1 },
+  Jupiter: { Sun: 2, Moon: 2, Mars: 2, Mercury: 0, Jupiter: 2, Venus: 0, Saturn: 1 },
+  Venus:   { Sun: 0, Moon: 0, Mars: 1, Mercury: 2, Jupiter: 1, Venus: 2, Saturn: 2 },
+  Saturn:  { Sun: 0, Moon: 0, Mars: 0, Mercury: 2, Jupiter: 1, Venus: 2, Saturn: 2 },
+};
+
+export function computeMatch(
+  userBirth: Birth,
+  partnerBirth: Birth,
+  userGender?: string | null,
+) {
+  const chartA = computeKundli("match-a", userBirth);
+  const chartB = computeKundli("match-b", partnerBirth);
+
+  const mA = rashis.findIndex((r) => r.name === chartA.moonSign);
+  const mB = rashis.findIndex((r) => r.name === chartB.moonSign);
+  const sA = chartA.nakshatra.index;
+  const sB = chartB.nakshatra.index;
+
+  const isUserFemale = userGender === "female";
+  const groom = isUserFemale ? { m: mB, s: sB } : { m: mA, s: sA };
+  const bride = isUserFemale ? { m: mA, s: sA } : { m: mB, s: sB };
+
+  // 1. Varna (1 pt)
+  const varna = VARNA_RANK[groom.m] >= VARNA_RANK[bride.m] ? 1 : 0;
+
+  // 2. Vashya (2 pts)
+  const vg = VASHYA_GROUP[groom.m];
+  const vb = VASHYA_GROUP[bride.m];
+  const vashya = vg === vb ? 2 : (vg === 1 && (vb === 0 || vb === 2)) || (vb === 1 && (vg === 0 || vg === 2)) ? 1 : 0.5;
+
+  // 3. Tara (3 pts)
+  const t1 = (((groom.s - bride.s + 27) % 27) + 1) % 9;
+  const t2 = (((bride.s - groom.s + 27) % 27) + 1) % 9;
+  const badTara = (t: number) => t === 3 || t === 5 || t === 7;
+  const tara = !badTara(t1) && !badTara(t2) ? 3 : !badTara(t1) || !badTara(t2) ? 1.5 : 0;
+
+  // 4. Yoni (4 pts)
+  const y1 = YONI_ID[groom.s];
+  const y2 = YONI_ID[bride.s];
+  const yoni = y1 === y2 ? 4 : YONI_ENEMIES[y1] === y2 ? 0 : 2;
+
+  // 5. Graha Maitri (5 pts)
+  const lG = SIGN_LORDS[groom.m];
+  const lB = SIGN_LORDS[bride.m];
+  const f1 = PLANET_FRIENDS[lG]?.[lB] ?? 1;
+  const f2 = PLANET_FRIENDS[lB]?.[lG] ?? 1;
+  const maitri =
+    lG === lB || (f1 === 2 && f2 === 2)
+      ? 5
+      : (f1 === 2 && f2 === 1) || (f1 === 1 && f2 === 2)
+        ? 4
+        : f1 === 1 && f2 === 1
+          ? 3
+          : (f1 === 2 && f2 === 0) || (f1 === 0 && f2 === 2)
+            ? 1
+            : (f1 === 1 && f2 === 0) || (f1 === 0 && f2 === 1)
+              ? 0.5
+              : 0;
+
+  // 6. Gana (6 pts)
+  const ganaG = GANA_BY_STAR[groom.s];
+  const ganaB = GANA_BY_STAR[bride.s];
+  const gana =
+    ganaG === ganaB
+      ? 6
+      : (ganaG === "Deva" && ganaB === "Manushya") || (ganaG === "Manushya" && ganaB === "Deva")
+        ? 5.5
+        : ganaG === "Rakshasa" && ganaB === "Deva"
+          ? 1
+          : 0;
+
+  // 7. Bhakoot (7 pts)
+  const bhakootDist = ((bride.m - groom.m + 12) % 12) + 1;
+  const badBhakoot = [2, 12, 5, 9, 6, 8].includes(bhakootDist);
+  const bhakoot = !badBhakoot || lG === lB || (f1 === 2 && f2 === 2) ? 7 : 0;
+
+  // 8. Nadi (8 pts)
+  const nadi = NADI_BY_STAR[groom.s] !== NADI_BY_STAR[bride.s] ? 8 : 0;
+
+  const kootas = [
+    { name: "Varna", score: varna, max: 1, meaning: "Spiritual & ego alignment" },
+    { name: "Vashya", score: vashya, max: 2, meaning: "Mutual devotion & attraction" },
+    { name: "Tara", score: tara, max: 3, meaning: "Destiny, luck & well-being" },
+    { name: "Yoni", score: yoni, max: 4, meaning: "Emotional & physical harmony" },
+    { name: "Graha Maitri", score: maitri, max: 5, meaning: "Intellectual friendship" },
+    { name: "Gana", score: gana, max: 6, meaning: "Temperament compatibility" },
+    { name: "Bhakoot", score: bhakoot, max: 7, meaning: "Family prosperity & growth" },
+    { name: "Nadi", score: nadi, max: 8, meaning: "Vitality, health & progeny" },
+  ];
+
+  const totalScore = kootas.reduce((acc, k) => acc + k.score, 0);
+
+  let verdict = "Low Compatibility — Consult Remedies";
+  if (totalScore >= 32) verdict = "Ati Uttama — Auspicious Divine Match";
+  else if (totalScore >= 25) verdict = "Uttama — Very Good Match";
+  else if (totalScore >= 18) verdict = "Madhyama — Acceptable Match";
+
+  const manglikHouses = new Set([1, 2, 4, 7, 8, 12]);
+  const marsA = chartA.planets.find((p) => p.id === "Mars")?.house;
+  const marsB = chartB.planets.find((p) => p.id === "Mars")?.house;
+  const isManglikA = marsA != null ? manglikHouses.has(marsA) : null;
+  const isManglikB = marsB != null ? manglikHouses.has(marsB) : null;
+
+  let manglikVerdict = "Exact birth times needed for both partners for Manglik check";
+  if (isManglikA !== null && isManglikB !== null) {
+    if (isManglikA === isManglikB) {
+      manglikVerdict = isManglikA
+        ? "Balanced (Both partners have Manglik Yoga — Dosha cancels)"
+        : "Compatible (Neither partner has Manglik Dosha)";
+    } else {
+      manglikVerdict = "One partner has Manglik placement — traditional remedy advised";
+    }
+  }
+
+  return {
+    totalScore,
+    maxScore: 36,
+    verdict,
+    kootas,
+    manglik: {
+      user: isManglikA,
+      partner: isManglikB,
+      verdict: manglikVerdict,
+    },
+    userSummary: {
+      moonSign: chartA.moonSign,
+      nakshatra: chartA.nakshatra.name,
+      pada: chartA.nakshatra.pada,
+    },
+    partnerSummary: {
+      moonSign: chartB.moonSign,
+      nakshatra: chartB.nakshatra.name,
+      pada: chartB.nakshatra.pada,
+    },
+  };
+}

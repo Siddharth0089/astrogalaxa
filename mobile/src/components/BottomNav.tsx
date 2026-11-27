@@ -103,10 +103,14 @@ export function BottomNav({
     <View
       pointerEvents="box-none"
       style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
         paddingHorizontal: 16,
-        paddingBottom: 12,
+        paddingBottom: 14,
         paddingTop: 4,
-        backgroundColor: "transparent",
+        zIndex: 50,
       }}
     >
       <View
@@ -114,12 +118,15 @@ export function BottomNav({
           height: 58,
           flexDirection: "row",
           borderRadius: 29,
-          backgroundColor: "rgba(18, 16, 28, 0.88)",
+          backgroundColor: "rgba(18, 16, 28, 0.78)",
           borderWidth: 1,
-          borderColor: "rgba(243, 197, 86, 0.3)",
+          borderColor: "rgba(243, 197, 86, 0.34)",
           paddingHorizontal: 8,
           alignItems: "center",
-          ...({ backdropFilter: "blur(16px)" } as object),
+          ...({
+            backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
+          } as object),
         }}
       >
         {items.map((item) => {

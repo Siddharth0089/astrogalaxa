@@ -62,4 +62,24 @@ describe("sidereal calculation", () => {
     expect(transits.planets.length).toBeGreaterThanOrEqual(6);
     expect(transits.sadeSati.status).toBeTruthy();
   });
+  it("computes Daily Panchang and 36-point Ashtakoota Gun Milan compatibility", async () => {
+    const { computePanchang, computeMatch } = await import("./kundli-engine.js");
+    const panchang = computePanchang("Asia/Kolkata", new Date("2026-01-01T06:00:00Z"));
+    expect(panchang.tithi).toBeTruthy();
+    expect(panchang.nakshatra.name).toBeTruthy();
+    expect(panchang.yoga).toBeTruthy();
+    expect(panchang.karana).toBeTruthy();
+    expect(panchang.rahuKaal).toBeTruthy();
+
+    const match = computeMatch(
+      { dob: new Date("1998-08-20T00:00:00Z"), time: "06:40", lat: 28.61, lng: 77.21, timezone: "Asia/Kolkata" },
+      { dob: new Date("2000-03-14T00:00:00Z"), time: "14:20", lat: 19.07, lng: 72.87, timezone: "Asia/Kolkata" },
+      "male",
+    );
+    expect(match.maxScore).toBe(36);
+    expect(match.totalScore).toBeGreaterThanOrEqual(0);
+    expect(match.totalScore).toBeLessThanOrEqual(36);
+    expect(match.kootas).toHaveLength(8);
+    expect(match.verdict).toBeTruthy();
+  });
 });

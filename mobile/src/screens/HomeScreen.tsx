@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { ZodiacBadge, ZodiacIcon } from "../components/ZodiacBadge";
-import { Horoscope, Language, NameSign, Screen } from "../types";
+import { Horoscope, Language, NameSign, PanchangData, Screen } from "../types";
+import { apiRequest } from "../../session";
 import { C, disclaimer } from "../theme/colors";
 import { formatTitleCase, getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
@@ -30,13 +31,27 @@ export function HomeScreen({
   onRetryHoroscope: () => void;
   onNavigate: (s: Screen) => void;
 }) {
+  const [panchang, setPanchang] = useState<PanchangData | null>(null);
   const t = getCopy(language);
   const displayName = formatTitleCase(name);
   const initial = (displayName || "U").charAt(0).toUpperCase();
 
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    apiRequest("/panchang/today", undefined, true)
+      .then((res: PanchangData) => {
+        if (active) setPanchang(res);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingBottom: 28, gap: 18 }]}
+      contentContainerStyle={[s.page, { paddingBottom: 100, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Top Greeting & Modern Celestial Profile Button */}
@@ -362,6 +377,115 @@ export function HomeScreen({
           </View>
         )}
       </View>
+
+      {/* Today's Vedic Panchang Almanac Card */}
+      {panchang && (
+        <View
+          style={{
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: "rgba(243, 197, 86, 0.25)",
+            backgroundColor: "rgba(18, 16, 28, 0.72)",
+            padding: 18,
+            gap: 14,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                color: C.gold,
+                fontSize: 11,
+                fontWeight: "700",
+                letterSpacing: 1.5,
+                textTransform: "uppercase",
+              }}
+            >
+              ✦ Today&apos;s Vedic Panchang
+            </Text>
+            <Text style={{ color: C.secondary, fontSize: 11 }}>
+              {panchang.vara}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {[
+              ["Tithi", `${panchang.tithi} (${panchang.paksha.replace(" Paksha", "")})`],
+              ["Nakshatra", `${panchang.nakshatra.name} · P${panchang.nakshatra.pada}`],
+              ["Yoga", panchang.yoga],
+              ["Karana", panchang.karana],
+            ].map(([lbl, val]) => (
+              <View
+                key={lbl}
+                style={{
+                  width: "48%",
+                  backgroundColor: "rgba(255, 255, 255, 0.04)",
+                  borderWidth: 1,
+                  borderColor: "rgba(255, 255, 255, 0.07)",
+                  borderRadius: 12,
+                  paddingHorizontal: 11,
+                  paddingVertical: 9,
+                  gap: 2,
+                }}
+              >
+                <Text style={{ color: C.muted, fontSize: 11 }}>{lbl}</Text>
+                <Text style={{ color: C.text, fontSize: 13, fontWeight: "700" }}>
+                  {val}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Muhurat Timings */}
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            <View
+              style={{
+                flex: 1,
+                minWidth: 140,
+                backgroundColor: "rgba(127, 224, 168, 0.09)",
+                borderWidth: 1,
+                borderColor: "rgba(127, 224, 168, 0.3)",
+                borderRadius: 12,
+                paddingHorizontal: 11,
+                paddingVertical: 8,
+                gap: 2,
+              }}
+            >
+              <Text style={{ color: "#7FE0A8", fontSize: 10.5, fontWeight: "700" }}>
+                ABHIJIT MUHURAT (AUSPICIOUS)
+              </Text>
+              <Text style={{ color: C.text, fontSize: 12, fontWeight: "600" }}>
+                {panchang.abhijitMuhurat}
+              </Text>
+            </View>
+            <View
+              style={{
+                flex: 1,
+                minWidth: 140,
+                backgroundColor: "rgba(255, 180, 171, 0.08)",
+                borderWidth: 1,
+                borderColor: "rgba(255, 180, 171, 0.25)",
+                borderRadius: 12,
+                paddingHorizontal: 11,
+                paddingVertical: 8,
+                gap: 2,
+              }}
+            >
+              <Text style={{ color: "#FFB4AB", fontSize: 10.5, fontWeight: "700" }}>
+                RAHU KAAL (AVOID NEW STARTS)
+              </Text>
+              <Text style={{ color: C.text, fontSize: 12, fontWeight: "600" }}>
+                {panchang.rahuKaal}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       <Text style={[s.disclaimer, { textAlign: "center", marginTop: 2 }]}>
         {disclaimer}

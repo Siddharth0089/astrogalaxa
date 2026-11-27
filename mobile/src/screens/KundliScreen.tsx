@@ -4,6 +4,7 @@ import { Button } from "../components/Button";
 import { ChartStyleMode, ChartVariant, LagnaChart } from "../components/LagnaChart";
 import { PlanetsTable } from "../components/PlanetsTable";
 import { DashaTimeline } from "../components/DashaTimeline";
+import { GunMilanMatch } from "../components/GunMilanMatch";
 import { ZodiacIcon } from "../components/ZodiacBadge";
 import { KundliData, Screen } from "../types";
 import { C } from "../theme/colors";
@@ -69,7 +70,7 @@ export function KundliScreen({
   onRetry: () => void;
   onNavigate: (s: Screen) => void;
 }) {
-  const [tab, setTab] = useState<"Chart" | "Planets" | "Insights" | "Dasha">("Chart");
+  const [tab, setTab] = useState<"Chart" | "Planets" | "Match" | "Insights" | "Dasha">("Chart");
   const [chartType, setChartType] = useState<ChartVariant>("lagna");
   const [chartStyle, setChartStyle] = useState<ChartStyleMode>("north");
 
@@ -109,7 +110,7 @@ export function KundliScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 28, gap: 18 }]}
+      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 100, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Spiritual Editorial Header (No App Bar) */}
@@ -159,10 +160,10 @@ export function KundliScreen({
         </View>
       </View>
 
-      {/* Modern Cosmic 4-Tab Bar */}
+      {/* Modern Cosmic 5-Tab Bar */}
       <View
         style={{
-          height: 46,
+          height: 44,
           flexDirection: "row",
           backgroundColor: "rgba(18, 16, 28, 0.85)",
           borderWidth: 1,
@@ -171,7 +172,7 @@ export function KundliScreen({
           padding: 4,
         }}
       >
-        {(["Chart", "Planets", "Insights", "Dasha"] as const).map((x) => {
+        {(["Chart", "Planets", "Match", "Insights", "Dasha"] as const).map((x) => {
           const active = tab === x;
           return (
             <Pressable
@@ -191,7 +192,7 @@ export function KundliScreen({
                 style={{
                   color: active ? C.onGold : C.secondary,
                   fontWeight: active ? "700" : "600",
-                  fontSize: 12.5,
+                  fontSize: 11.5,
                 }}
               >
                 {x}
@@ -462,6 +463,8 @@ export function KundliScreen({
         </View>
       ) : tab === "Planets" ? (
         <PlanetsTable planets={kundli.planets} />
+      ) : tab === "Match" ? (
+        <GunMilanMatch />
       ) : tab === "Insights" ? (
         <View style={{ gap: 16 }}>
           {/* 1. Live Transits (Gochar) & Shani Sade Sati */}

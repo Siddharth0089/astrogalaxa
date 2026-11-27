@@ -25,7 +25,13 @@ import {
   requireAuth,
 } from "../common/http.js";
 import { nameSign, sunSign } from "../common/signs.js";
-import { computeKundli, computeTransits, ENGINE_VERSION } from "./kundli-engine.js";
+import {
+  computeKundli,
+  computeMatch,
+  computePanchang,
+  computeTransits,
+  ENGINE_VERSION,
+} from "./kundli-engine.js";
 import { localizeHoroscope, seedHoroscope } from "./horoscope-content.js";
 
 const validTimezone = (zone: string) => {
@@ -261,7 +267,40 @@ kundliRouter.post(
     ok(res, { ...k, transits });
   }),
 );
+kundliRouter.post(
+  "/match",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const u = await User.findById(req.userId);
+    if (!u?.birth || !u.birth.dob)
+      throw new AppError(
+        409,
+        "BIRTH_DETAILS_REQUIRED",
+        "Complete your own birth details first",
+      );
+    const body = z
+      .object({
+        partnerName: z.string().trim().min(1).max(100),
+        partner: birthSchema,
+      })
+      .strict()
+      .parse(req.body);
+    const result = computeMatch(u.birth, body.partner, u.gender);
+    ok(res, {
+      partnerName: body.partnerName,
+      ...result,
+    });
+  }),
+);
 export const publicRouter = Router();
+publicRouter.get(
+  "/panchang/today",
+  requireAuth,
+  asyncRoute(async (req: AuthRequest, res) => {
+    const u = await User.findById(req.userId).lean();
+    const tz = u?.prefs?.timezone || u?.birth?.timezone || "Asia/Kolkata";
+    ok(res, computePanchang(tz));
+  }),
+);
 publicRouter.get(
   "/places/search",
   asyncRoute(async (req, res) => {

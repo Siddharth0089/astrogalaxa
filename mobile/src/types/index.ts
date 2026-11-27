@@ -175,6 +175,36 @@ export type KundliData = {
   };
 };
 
+export type PanchangData = {
+  date: string;
+  timezone: string;
+  vara: string;
+  tithi: string;
+  paksha: string;
+  nakshatra: { name: string; index: number; pada: number; lord: string };
+  yoga: string;
+  karana: string;
+  sunSign: string;
+  moonSign: string;
+  rahuKaal: string;
+  abhijitMuhurat: string;
+};
+
+export type GunMilanResult = {
+  partnerName: string;
+  totalScore: number;
+  maxScore: number;
+  verdict: string;
+  kootas: { name: string; score: number; max: number; meaning: string }[];
+  manglik: {
+    user: boolean | null;
+    partner: boolean | null;
+    verdict: string;
+  };
+  userSummary: { moonSign: string; nakshatra: string; pada: number };
+  partnerSummary: { moonSign: string; nakshatra: string; pada: number };
+};
+
 export type Astrologer = {
   _id: string;
   name: string;
