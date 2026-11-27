@@ -73,7 +73,7 @@ authRouter.post(
     try { counter = await incrementLimit(true); }
     catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) counter = await incrementLimit(false); else throw error; }
     if (!counter) throw new AppError(503, "RATE_LIMIT_UNAVAILABLE", "Please try again later");
-    if (counter.count > 5) return ok(res, { resendAfterSeconds: 30 });
+    if (counter.count > 5) return ok(res, { resendAfterSeconds: 60, expiresInSeconds: 600 });
     if (!env.RESEND_API_KEY && !env.OTP_LOG_CODES)
       throw new AppError(
         503,
@@ -82,7 +82,7 @@ authRouter.post(
       );
     const code = crypto.randomInt(100000, 1000000).toString();
     try { await OtpChallenge.updateOne(
-      { email: normalized, $or: [{ lastSentAt: { $lte: new Date(now - 30000) } }, { lastSentAt: { $exists: false } }] },
+      { email: normalized, $or: [{ lastSentAt: { $lte: new Date(now - 60000) } }, { lastSentAt: { $exists: false } }] },
       {
         email: normalized,
         codeHash: hashOtp(normalized, code),
@@ -92,7 +92,7 @@ authRouter.post(
         consumedAt: null,
       },
       { upsert: true },
-    ); } catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) return ok(res, { resendAfterSeconds: 30 }); throw error; }
+    ); } catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) return ok(res, { resendAfterSeconds: 60, expiresInSeconds: 600 }); throw error; }
     if (env.RESEND_API_KEY) {
       try {
         const result = await new Resend(env.RESEND_API_KEY).emails.send({
@@ -128,7 +128,7 @@ authRouter.post(
     if (env.OTP_LOG_CODES) {
       req.log.info({ code }, "Development OTP");
     }
-    return ok(res, { resendAfterSeconds: 30 });
+    return ok(res, { resendAfterSeconds: 60, expiresInSeconds: 600 });
   }),
 );
 authRouter.post(
@@ -152,7 +152,7 @@ authRouter.post(
       !challenge.codeHash ||
       challenge.expiresAt < new Date()
     )
-      throw new AppError(400, "OTP_EXPIRED", "That code has expired");
+      throw new AppError(400, "OTP_EXPIRED", "That code has expired or maximum attempts reached. Please request a new code.");
     if (!secureEquals(challenge.codeHash, hashOtp(email.toLowerCase(), code)))
       throw new AppError(400, "OTP_INVALID", "That code is incorrect");
     const consumed = await OtpChallenge.updateOne({ _id: challenge._id, codeHash: challenge.codeHash, consumedAt: null, expiresAt: { $gt: new Date() } }, { $set: { consumedAt: new Date() } });

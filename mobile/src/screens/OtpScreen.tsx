@@ -1,4 +1,4 @@
-import React, { RefObject } from "react";
+import React, { RefObject, useEffect } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Button } from "../components/Button";
 import { C } from "../theme/colors";
@@ -12,6 +12,7 @@ export function OtpScreen({
   authError,
   setAuthError,
   secondsLeft,
+  expirySecondsLeft = 600,
   codeInput,
   onVerify,
   onResend,
@@ -24,14 +25,28 @@ export function OtpScreen({
   authError: string;
   setAuthError: (e: string) => void;
   secondsLeft: number;
+  expirySecondsLeft?: number;
   codeInput: RefObject<TextInput | null>;
   onVerify: () => void;
   onResend: () => void;
   onChangeEmail: () => void;
 }) {
+  // Automatically activate the input box when screen loads so user can immediately type
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      codeInput.current?.focus();
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [codeInput]);
+
+  const isExpired = expirySecondsLeft <= 0;
+  const expMinutes = Math.floor(expirySecondsLeft / 60);
+  const expSeconds = expirySecondsLeft % 60;
+  const expiryFormatted = `${String(expMinutes).padStart(2, "0")}:${String(expSeconds).padStart(2, "0")}`;
+
   return (
     <View style={{ flex: 1 }}>
-      {/* Top Bar: Only back button arrow on top-left (no appbar title and no right spacer circle) */}
+      {/* Top Bar: Pure back arrow only (no tile background, no border, no header text) */}
       <View
         style={{
           paddingHorizontal: 20,
@@ -45,27 +60,20 @@ export function OtpScreen({
           accessibilityRole="button"
           accessibilityLabel="Go back"
           onPress={onChangeEmail}
-          hitSlop={14}
+          hitSlop={16}
           style={({ pressed }) => [
             {
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1,
-              borderColor: "rgba(255, 255, 255, 0.16)",
-              opacity: pressed ? 0.7 : 1,
+              paddingVertical: 6,
+              paddingRight: 16,
+              opacity: pressed ? 0.6 : 1,
             },
           ]}
         >
           <Text
             style={{
-              color: C.text,
-              fontSize: 32,
-              lineHeight: 34,
-              marginTop: -2,
+              color: "#F5F5F7",
+              fontSize: 38,
+              lineHeight: 38,
             }}
           >
             ‹
@@ -92,7 +100,7 @@ export function OtpScreen({
             flexWrap: "wrap",
             justifyContent: "center",
             alignItems: "center",
-            gap: 4,
+            gap: 6,
           }}
         >
           <Text style={[s.sub, { textAlign: "center" }]}>
@@ -100,25 +108,31 @@ export function OtpScreen({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Change email"
+            accessibilityLabel="Change email address"
             onPress={onChangeEmail}
             hitSlop={8}
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
           >
-            <Text style={[s.link, { textDecorationLine: "underline" }]}>
+            <Text
+              style={[
+                s.link,
+                { textDecorationLine: "underline", color: "#F3C556" },
+              ]}
+            >
               Change email
             </Text>
           </Pressable>
         </View>
 
+        {/* 6 Digit Verification Input with Glow Focus */}
         <Pressable
           accessibilityLabel="Verification code, six digits"
           onPress={() => codeInput.current?.focus()}
-          style={{ marginVertical: 14 }}
+          style={{ marginVertical: 12 }}
         >
           <View pointerEvents="none" style={{ flexDirection: "row", gap: 10 }}>
             {Array.from({ length: 6 }, (_, i) => {
-              const isCurrent = i === code.length;
+              const isCurrent = i === code.length && !isExpired;
               const isFilled = i < code.length;
               return (
                 <View
@@ -128,7 +142,9 @@ export function OtpScreen({
                     height: 60,
                     borderRadius: 14,
                     borderWidth: isCurrent ? 1.5 : 1,
-                    borderColor: isCurrent
+                    borderColor: isExpired
+                      ? "rgba(239, 68, 68, 0.4)"
+                      : isCurrent
                       ? "#F3C556"
                       : isFilled
                       ? "rgba(243, 197, 86, 0.45)"
@@ -171,6 +187,7 @@ export function OtpScreen({
             textContentType="oneTimeCode"
             autoComplete="one-time-code"
             maxLength={6}
+            autoFocus={true}
             style={{
               position: "absolute",
               opacity: 0,
@@ -180,6 +197,22 @@ export function OtpScreen({
           />
         </Pressable>
 
+        {/* Security Expiry Timer to prevent fraud */}
+        <View style={{ alignItems: "center" }}>
+          <Text
+            style={{
+              fontSize: 13,
+              color: isExpired ? "#FCA5A5" : "#A1A1AA",
+              letterSpacing: 0.2,
+            }}
+          >
+            {isExpired
+              ? "⚠️ Code expired for your security. Please request a new code."
+              : `🔒 Code expires in ${expiryFormatted}`}
+          </Text>
+        </View>
+
+        {/* Advanced Error Banner */}
         {!!authError && (
           <View
             style={{
@@ -205,6 +238,7 @@ export function OtpScreen({
           </View>
         )}
 
+        {/* 60s Resend Timer */}
         <View style={{ alignItems: "center", marginVertical: 4 }}>
           {secondsLeft > 0 ? (
             <Text style={s.helper}>
@@ -218,14 +252,22 @@ export function OtpScreen({
               onPress={onResend}
               hitSlop={8}
             >
-              <Text style={s.link}>{busy ? "Sending…" : "Resend code"}</Text>
+              <Text
+                style={[
+                  s.link,
+                  { color: "#F3C556", textDecorationLine: "underline" },
+                ]}
+              >
+                {busy ? "Sending…" : "Resend code"}
+              </Text>
             </Pressable>
           )}
         </View>
 
+        {/* Action Button */}
         <Button
           label={busy ? "Verifying…" : "Verify and continue"}
-          disabled={code.length !== 6 || busy}
+          disabled={code.length !== 6 || busy || isExpired}
           busy={busy}
           onPress={onVerify}
         />

@@ -60,12 +60,34 @@ async function send(
     }
     throw err;
   }
-  const json = await response.json();
-  if (!response.ok)
-    throw new ApiError(
-      response.status,
-      json.error?.message || "Request failed",
-    );
+  const json = await response.json().catch(() => null);
+  if (!response.ok) {
+    const rawCode = json?.error?.code || "";
+    const rawMsg = json?.error?.message || "";
+    let friendlyMessage = rawMsg || "Something went wrong. Please try again.";
+
+    if (rawCode === "RATE_LIMITED" || response.status === 429) {
+      friendlyMessage =
+        "Too many requests. Please wait a moment before trying again.";
+    } else if (rawCode === "OTP_EXPIRED") {
+      friendlyMessage =
+        "This verification code has expired. Please tap 'Resend code' to get a new code.";
+    } else if (rawCode === "OTP_INVALID") {
+      friendlyMessage =
+        "The 6-digit code you entered is incorrect. Please check and try again.";
+    } else if (rawCode === "EMAIL_UNAVAILABLE" || response.status === 503) {
+      friendlyMessage =
+        "Verification service is temporarily unavailable. Please try again in a few moments.";
+    } else if (rawCode === "BIRTH_DETAILS_INVALID") {
+      friendlyMessage =
+        "Please check your birth date, time, and birth city details.";
+    } else if (rawCode === "UNAUTHORIZED" || response.status === 401) {
+      friendlyMessage =
+        "Your session has expired. Please sign in again.";
+    }
+
+    throw new ApiError(response.status, friendlyMessage);
+  }
   return json.data;
 }
 async function read(key: string) {
