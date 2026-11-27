@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.expo/
+.env
+.env.*
+!.env.example
+google-services.json
+GoogleService-Info.plist
+coverage/
+*.log
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

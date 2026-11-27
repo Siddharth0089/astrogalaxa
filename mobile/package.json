@@ -1,0 +1,46 @@
+{
+  "name": "@nakshatra/mobile",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@expo-google-fonts/cormorant-garamond": "^0.2.3",
+    "@expo-google-fonts/inter": "^0.2.3",
+    "@expo/cli": "^0.22.28",
+    "@expo/metro-runtime": "~4.0.0",
+    "@react-native-async-storage/async-storage": "^2.1.0",
+    "@react-navigation/bottom-tabs": "^7.2.0",
+    "@react-navigation/native": "^7.0.14",
+    "@react-navigation/native-stack": "^7.2.0",
+    "@tanstack/react-query": "^5.62.11",
+    "expo": "^52.0.27",
+    "expo-crypto": "~14.0.2",
+    "expo-dev-client": "~5.0.20",
+    "expo-font": "^13.0.2",
+    "expo-modules-core": "^2.2.3",
+    "expo-secure-store": "^14.0.1",
+    "expo-status-bar": "^2.0.0",
+    "react": "18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.54.2",
+    "react-native": "0.76.6",
+    "react-native-safe-area-context": "^4.12.0",
+    "react-native-screens": "^4.4.0",
+    "react-native-svg": "^15.8.0",
+    "react-native-web": "^0.19.13",
+    "socket.io-client": "^4.8.1",
+    "zod": "^3.24.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

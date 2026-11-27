@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Astro Galaxa",
+    "slug": "astro-galaxa",
+    "scheme": "astrogalaxa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "bundleIdentifier": "com.nakshatra.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.nakshatra.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "apiUrl": "http://10.0.2.2:3000/api/v1"
+    }
+  }
+}
