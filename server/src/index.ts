@@ -16,6 +16,7 @@ import { errorHandler, ok } from './common/http.js';
 import { Astrologer, ChatMessage, ChatThread, Session } from './models.js';
 import { starterAstrologers } from './seeds/astrologers.js';
 import { authRouter } from './modules/auth.js';
+import { startDailyNotificationScheduler } from './modules/notifications.js';
 import {
   astrologersRouter,
   chatRouter,
@@ -214,6 +215,7 @@ async function start() {
     await Astrologer.insertMany(starterAstrologers);
     logger.info('Seeded default verified free astrologers');
   }
+  startDailyNotificationScheduler(logger);
   server.listen(env.PORT, () => logger.info({ port: env.PORT }, 'Astro Galaxa API started'));
 }
 

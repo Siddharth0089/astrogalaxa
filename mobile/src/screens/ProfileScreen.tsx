@@ -5,6 +5,10 @@ import { Field } from "../components/Field";
 import { LegalModal, LegalTab } from "../components/LegalModal";
 import { Gender, Language, UserProfile } from "../types";
 import { apiRequest } from "../../session";
+import {
+  registerForPushNotificationsAsync,
+  triggerLocalTestNotificationAsync,
+} from "../utils/pushNotifications";
 import { C } from "../theme/colors";
 import { s } from "../theme/styles";
 
@@ -36,6 +40,7 @@ export function ProfileScreen({
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [langStatus, setLangStatus] = useState("");
   const [legalVisible, setLegalVisible] = useState(false);
@@ -349,6 +354,37 @@ export function ProfileScreen({
           placeholder="08:00"
         />
         <Text style={s.helper}>Timezone: {prefs.timezone}</Text>
+        <Button
+          label={testingPush ? "Testing Notification…" : "Send Test Phone Notification"}
+          variant="glass"
+          disabled={testingPush}
+          onPress={async () => {
+            if (testingPush) return;
+            setTestingPush(true);
+            try {
+              if (Platform.OS === "web") {
+                Alert.alert(
+                  "Mobile Only",
+                  "Push notifications run natively on Android and iOS devices.",
+                );
+              } else {
+                const token = await registerForPushNotificationsAsync();
+                if (token) {
+                  await apiRequest("/users/me/test-notification", {}, true, "POST").catch(() => {});
+                }
+                const shown = await triggerLocalTestNotificationAsync();
+                Alert.alert(
+                  shown ? "Notification Sent" : "Permission Required",
+                  shown
+                    ? "Check your phone notification shade! Daily alerts will trigger automatically at your scheduled time."
+                    : "Please allow notifications in your phone settings.",
+                );
+              }
+            } finally {
+              setTestingPush(false);
+            }
+          }}
+        />
       </View>
       {!!error && (
         <Text accessibilityRole="alert" style={{ color: "#FFB4AB" }}>

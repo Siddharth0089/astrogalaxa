@@ -1,8 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import {
+  Alert,
+  BackHandler,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import { CormorantGaramond_700Bold } from "@expo-google-fonts/cormorant-garamond";
+import { registerForPushNotificationsAsync } from "./src/utils/pushNotifications";
 
 import {
   apiRequest,
@@ -86,8 +96,55 @@ export default function App() {
   const [placesError, setPlacesError] = useState("");
   const [searchingPlaces, setSearchingPlaces] = useState(false);
   const codeInput = useRef<TextInput>(null);
+  const pushTokenRef = useRef<string | null>(null);
 
   const secondsLeft = Math.max(0, Math.ceil((resendAt - now) / 1000));
+
+  // Register device push notifications automatically once authenticated
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    void registerForPushNotificationsAsync().then((registeredToken) => {
+      if (active && registeredToken) pushTokenRef.current = registeredToken;
+    });
+    return () => {
+      active = false;
+    };
+  }, [token]);
+
+  // Handle Android / phone hardware & gesture Back button inside the app
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (screen === "reading") {
+        setScreen("tarot");
+        return true;
+      }
+      if (screen === "live") {
+        setScreen("chat");
+        return true;
+      }
+      if (screen === "otp") {
+        setScreen("login");
+        return true;
+      }
+      if (screen === "result") {
+        setScreen("birth");
+        return true;
+      }
+      if (
+        screen === "kundli" ||
+        screen === "chat" ||
+        screen === "tarot" ||
+        screen === "profile"
+      ) {
+        setScreen("home");
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [screen]);
 
   useEffect(() => {
     let active = true;
@@ -405,6 +462,15 @@ export default function App() {
 
   const logout = async () => {
     try {
+      if (pushTokenRef.current) {
+        await apiRequest(
+          "/users/me/device-token",
+          { token: pushTokenRef.current },
+          true,
+          "DELETE",
+        ).catch(() => {});
+        pushTokenRef.current = null;
+      }
       await logoutSession();
       setToken(undefined);
       setKundli(null);

@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
+import {
+  BackHandler,
+  FlatList,
+  Platform,
+  Pressable,
+  ScrollView,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { io, Socket } from "socket.io-client";
 import { Button } from "../components/Button";
 import { Astrologer, Language, Screen } from "../types";
@@ -98,6 +108,15 @@ export function LiveScreen({
       socket.disconnect();
       socketRef.current = null;
     };
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId || Platform.OS === "web") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setRatingPrompt(true);
+      return true;
+    });
+    return () => sub.remove();
   }, [threadId]);
 
   const startSession = async (expert: Astrologer) => {

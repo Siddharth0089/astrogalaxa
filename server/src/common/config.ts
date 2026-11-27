@@ -25,6 +25,7 @@ const schema = z
     RESEND_API_KEY: z.string().optional(),
     EMAIL_FROM: z.string().default('Astro Galaxa <auth@example.com>'),
     LEGAL_SUPPORT_EMAIL: z.string().default('support@astrogalaxa.com'),
+    EXPO_ACCESS_TOKEN: z.string().optional(),
     GOOGLE_CLIENT_IDS: z.string().default(''),
     ALLOWED_ORIGINS: z.string().default('http://localhost:8081'),
     GEMINI_API_KEY: z.string().optional(),

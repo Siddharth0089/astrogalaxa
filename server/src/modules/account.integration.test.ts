@@ -571,5 +571,34 @@ describe("astrologers and unavailable AI", () => {
     const updatedExpert = await models.Astrologer.findById(expert._id);
     expect(updatedExpert?.ratingAvg).toBe(5);
     expect(updatedExpert?.ratingCount).toBe(1);
+
+    const emptyPush = await request(app)
+      .post("/users/me/test-notification")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+    expect(emptyPush.status).toBe(200);
+    expect(emptyPush.body.data.sent).toBe(0);
+    expect(emptyPush.body.data.reason).toBe("no_device_tokens");
+
+    await models.DeviceToken.create({
+      userId: user._id,
+      token: "ExponentPushToken[live-test-token-999]",
+      platform: "android",
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ status: "ok" }] }),
+    } as unknown as Response);
+    try {
+      const sentPush = await request(app)
+        .post("/users/me/test-notification")
+        .set("Authorization", `Bearer ${token}`)
+        .send({});
+      expect(sentPush.status).toBe(200);
+      expect(sentPush.body.data.sent).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

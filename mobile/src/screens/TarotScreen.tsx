@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Easing,
   Image,
   Platform,
@@ -274,6 +275,15 @@ export function TarotScreen({
     }, 320);
     return () => clearTimeout(handle);
   }, [authenticated, topic, question, showAllCards, setCards]);
+
+  useEffect(() => {
+    if (!viewJournal || Platform.OS === "web") return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setViewJournal(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [viewJournal]);
 
   const loadJournal = async () => {
     setViewJournal(true);

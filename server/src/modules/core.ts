@@ -5,6 +5,7 @@ import { createHash, randomInt } from "node:crypto";
 import { DateTime } from "luxon";
 import { env } from "../common/config.js";
 import { tarotContent } from "../seeds/tarot-content.js";
+import { sendExpoPushMessages } from "./notifications.js";
 import {
   Astrologer,
   AstrologerSubscription,
@@ -82,73 +83,6 @@ usersRouter.get(
       nameSign: u.nameSign,
       sunSign: u.sunSign,
       prefs: u.prefs,
-    });
-  }),
-);
-usersRouter.post(
-  "/me/device-token",
-  asyncRoute(async (req: AuthRequest, res) => {
-    const body = z
-      .object({
-        token: z.string().trim().min(10).max(512),
-        platform: z.enum(["ios", "android", "web"]),
-        appVersion: z.string().trim().max(40).optional(),
-      })
-      .strict()
-      .parse(req.body);
-    const saved = await DeviceToken.findOneAndUpdate(
-      { token: body.token },
-      {
-        $set: {
-          userId: req.userId,
-          platform: body.platform,
-          appVersion: body.appVersion ?? null,
-          lastSeenAt: new Date(),
-        },
-      },
-      { upsert: true, new: true },
-    ).lean();
-    ok(res, { registered: true, id: saved?._id?.toString() }, 201);
-  }),
-);
-usersRouter.delete(
-  "/me/device-token",
-  asyncRoute(async (req: AuthRequest, res) => {
-    const { token } = z
-      .object({ token: z.string().trim().min(10).max(512) })
-      .strict()
-      .parse(req.body);
-    await DeviceToken.deleteOne({ userId: req.userId, token });
-    ok(res, { removed: true });
-  }),
-);
-usersRouter.get(
-  "/me/export",
-  asyncRoute(async (req: AuthRequest, res) => {
-    const [u, kundli, readings, threads] = await Promise.all([
-      User.findById(req.userId)
-        .select("email name gender language birth nameSign sunSign prefs createdAt updatedAt")
-        .lean(),
-      Kundli.findOne({ userId: req.userId }).lean(),
-      TarotReading.find({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
-      ChatThread.find({ userId: req.userId }).sort({ startedAt: -1 }).lean(),
-    ]);
-    if (!u) throw new AppError(404, "USER_NOT_FOUND", "User not found");
-    const messages = threads.length
-      ? await ChatMessage.find({
-          threadId: { $in: threads.map((t) => t._id) },
-        })
-          .sort({ createdAt: 1 })
-          .select("threadId sender text createdAt")
-          .lean()
-      : [];
-    ok(res, {
-      exportedAt: new Date().toISOString(),
-      profile: u,
-      kundli,
-      tarotReadings: readings,
-      chatThreads: threads,
-      chatMessages: messages,
     });
   }),
 );
@@ -253,6 +187,43 @@ usersRouter.delete(
       .parse(req.body);
     await DeviceToken.deleteOne({ userId: req.userId, token });
     ok(res, { removed: true });
+  }),
+);
+usersRouter.post(
+  "/me/test-notification",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const [u, tokens] = await Promise.all([
+      User.findById(req.userId).select("name language prefs.language").lean(),
+      DeviceToken.find({ userId: req.userId }).select("token").lean(),
+    ]);
+    const validTokens = tokens.filter((t) => Boolean(t.token));
+    if (!validTokens.length) {
+      return ok(res, { sent: 0, reason: "no_device_tokens" });
+    }
+    const lang = u?.language || u?.prefs?.language || "English";
+    const title =
+      lang === "Hindi"
+        ? "✦ Astro Galaxa सूचना"
+        : lang === "Hinglish"
+          ? "✦ Astro Galaxa Alert"
+          : "✦ Astro Galaxa Guidance";
+    const body =
+      lang === "Hindi"
+        ? "आपके फ़ोन पर दैनिक राशिफल सूचनाएं सक्रिय हैं।"
+        : lang === "Hinglish"
+          ? "Aapke phone par daily horoscope notifications active hain."
+          : "Your daily horoscope notifications are active on this device.";
+    const result = await sendExpoPushMessages(
+      validTokens.map((t) => ({
+        to: t.token ?? "",
+        title,
+        body,
+        sound: "default",
+        channelId: "daily-guidance",
+        data: { screen: "home", type: "test" },
+      })),
+    );
+    ok(res, { sent: result.sent });
   }),
 );
 usersRouter.get(
