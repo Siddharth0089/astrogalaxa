@@ -1,8 +1,8 @@
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { ZodiacBadge } from "../components/ZodiacBadge";
-import { getZodiacSymbol, Horoscope, NameSign, Screen } from "../types";
-import { disclaimer } from "../theme/colors";
+import { ZodiacBadge, ZodiacIcon } from "../components/ZodiacBadge";
+import { Horoscope, NameSign, Screen } from "../types";
+import { C, disclaimer } from "../theme/colors";
 import { s } from "../theme/styles";
 
 export function HomeScreen({
@@ -50,8 +50,8 @@ export function HomeScreen({
       <View style={s.card}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
           <ZodiacBadge
-            symbol={getZodiacSymbol(nameSign?.name || sunSign)}
-            size={52}
+            sign={nameSign?.name || sunSign}
+            size={56}
             pulse={true}
           />
           <View style={{ flex: 1 }}>
@@ -67,10 +67,18 @@ export function HomeScreen({
             </Text>
           </View>
         </View>
-        <Text style={[s.sub, { marginTop: 10 }]}>
-          Sun sign by birth date: {getZodiacSymbol(sunSign)}{" "}
-          {sunSign ?? "Unavailable"}
-        </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 10,
+          }}
+        >
+          <Text style={s.sub}>Sun sign by birth date:</Text>
+          <ZodiacIcon sign={sunSign} size={15} color={C.gold} />
+          <Text style={s.sub}>{sunSign ?? "Unavailable"}</Text>
+        </View>
       </View>
       <View style={[s.card, { backgroundColor: "#F5F5F7", gap: 12 }]}>
         <Text style={{ color: "#202127", fontWeight: "700", fontSize: 14 }}>

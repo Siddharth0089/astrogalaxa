@@ -4,7 +4,9 @@ import { Button } from "../components/Button";
 import { LagnaChart } from "../components/LagnaChart";
 import { PlanetsTable } from "../components/PlanetsTable";
 import { DashaTimeline } from "../components/DashaTimeline";
-import { getZodiacSymbol, KundliData, Screen } from "../types";
+import { ZodiacIcon } from "../components/ZodiacBadge";
+import { KundliData, Screen } from "../types";
+import { C } from "../theme/colors";
 import { s } from "../theme/styles";
 
 export function KundliScreen({
@@ -85,19 +87,45 @@ export function KundliScreen({
                 ]}
               >
                 <Text style={s.sub}>{x}</Text>
-                <Text style={s.tileTitle}>
-                  {
-                    [
-                      kundli.ascendant?.sign
-                        ? `${getZodiacSymbol(kundli.ascendant.sign)} ${kundli.ascendant.sign}`
-                        : "Needs birth time",
-                      kundli.moonSign
-                        ? `${getZodiacSymbol(kundli.moonSign)} ${kundli.moonSign}`
-                        : "Unavailable",
-                      kundli.nakshatra.name,
-                    ][i]
-                  }
-                </Text>
+                {i === 0 && kundli.ascendant?.sign ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <ZodiacIcon
+                      sign={kundli.ascendant.sign}
+                      size={16}
+                      color={C.gold}
+                    />
+                    <Text style={s.tileTitle}>{kundli.ascendant.sign}</Text>
+                  </View>
+                ) : i === 1 && kundli.moonSign ? (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <ZodiacIcon
+                      sign={kundli.moonSign}
+                      size={16}
+                      color={C.gold}
+                    />
+                    <Text style={s.tileTitle}>{kundli.moonSign}</Text>
+                  </View>
+                ) : (
+                  <Text style={s.tileTitle}>
+                    {i === 0
+                      ? "Needs birth time"
+                      : i === 1
+                        ? "Unavailable"
+                        : kundli.nakshatra.name}
+                  </Text>
+                )}
               </View>
             ))}
           </View>
