@@ -11,6 +11,7 @@ import {
   logoutSession,
   restoreSession,
   saveSession,
+  updateSessionUser,
 } from "./session";
 
 import { C } from "./src/theme/colors";
@@ -98,6 +99,27 @@ export default function App() {
         setEmail(session.user?.email ?? "");
         setNameSign((session.user?.nameSign as NameSign | null) ?? null);
         setSunSign(session.user?.sunSign ?? null);
+        if (session.user?.birth) {
+          const b = session.user.birth;
+          const dobDate = b.dob ? new Date(b.dob) : null;
+          const formattedDob =
+            dobDate && !isNaN(dobDate.getTime())
+              ? `${String(dobDate.getUTCDate()).padStart(2, "0")} / ${String(dobDate.getUTCMonth() + 1).padStart(2, "0")} / ${dobDate.getUTCFullYear()}`
+              : "";
+          setBirth({
+            dob: formattedDob,
+            time: b.time ?? "",
+            place: b.placeName ?? "",
+          });
+          if (b.placeName && b.lat && b.lng && b.timezone) {
+            setSelectedPlace({
+              name: b.placeName,
+              lat: b.lat,
+              lng: b.lng,
+              timezone: b.timezone,
+            });
+          }
+        }
         setScreen(session.onboardingComplete ? "home" : "birth");
       })
       .catch(() => {
@@ -338,6 +360,20 @@ export default function App() {
       );
       setNameSign(updated.nameSign ?? null);
       setSunSign(updated.sunSign ?? null);
+      await updateSessionUser({
+        name,
+        birth: {
+          dob: date.toISOString(),
+          time,
+          placeName: placeToUse.name,
+          lat: placeToUse.lat,
+          lng: placeToUse.lng,
+          timezone: placeToUse.timezone,
+        },
+        nameSign: updated.nameSign,
+        sunSign: updated.sunSign,
+        onboardingComplete: true,
+      });
       go("result");
     } catch (e) {
       Alert.alert("Could not save details", String(e));

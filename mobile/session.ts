@@ -9,15 +9,27 @@ const api =
     : "http://localhost:3000/api/v1");
 const sessionKey = "nakshatra_session";
 const deviceKey = "nakshatra_device_id";
-type Session = { accessToken: string; refreshToken: string };
-type Payload = Session & {
-  user: {
-    name?: string;
-    nameSign?: unknown;
-    sunSign?: string;
-    onboardingComplete?: boolean;
-    email?: string;
+export type UserProfile = {
+  id?: string;
+  name?: string;
+  nameSign?: unknown;
+  sunSign?: string;
+  onboardingComplete?: boolean;
+  email?: string;
+  birth?: {
+    dob?: string;
+    time?: string | null;
+    placeName?: string;
+    lat?: number;
+    lng?: number;
+    timezone?: string;
   };
+  prefs?: Record<string, unknown>;
+};
+
+export type Session = { accessToken: string; refreshToken: string };
+export type Payload = Session & {
+  user: UserProfile;
   onboardingComplete: boolean;
 };
 let current: Session | null = null;
@@ -90,19 +102,63 @@ async function send(
   }
   return json.data;
 }
-async function read(key: string) {
-  return Platform.OS === "web" ? null : SecureStore.getItemAsync(key);
+async function read(key: string): Promise<string | null> {
+  if (Platform.OS === "web") {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        return window.localStorage.getItem(key);
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch {
+    return null;
+  }
 }
-async function write(key: string, value: string) {
-  if (Platform.OS !== "web") await SecureStore.setItemAsync(key, value);
+
+async function write(key: string, value: string): Promise<void> {
+  if (Platform.OS === "web") {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(key, value);
+      }
+    } catch {}
+    return;
+  }
+  try {
+    await SecureStore.setItemAsync(key, value);
+  } catch {}
 }
-async function remove(key: string) {
-  if (Platform.OS !== "web") await SecureStore.deleteItemAsync(key);
+
+async function remove(key: string): Promise<void> {
+  if (Platform.OS === "web") {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.removeItem(key);
+      }
+    } catch {}
+    return;
+  }
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch {}
 }
+
 export async function deviceDetails() {
   let deviceId = memoryDeviceId ?? (await read(deviceKey));
   if (!deviceId) {
-    deviceId = Crypto.randomUUID();
+    try {
+      deviceId = Crypto.randomUUID();
+    } catch {
+      deviceId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+      });
+    }
     await write(deviceKey, deviceId);
   }
   memoryDeviceId = deviceId;
@@ -114,25 +170,55 @@ export async function deviceDetails() {
         : "web";
   return { deviceId, platform };
 }
+
 export async function saveSession(payload: Payload) {
   const next = {
     accessToken: payload.accessToken,
     refreshToken: payload.refreshToken,
+    user: payload.user,
+    onboardingComplete: payload.onboardingComplete,
   };
   await write(sessionKey, JSON.stringify(next));
-  current = next;
+  current = {
+    accessToken: payload.accessToken,
+    refreshToken: payload.refreshToken,
+  };
 }
+
+export async function updateSessionUser(
+  userPartial: Partial<UserProfile> & { onboardingComplete?: boolean },
+) {
+  const saved = await read(sessionKey);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    const updated = {
+      ...parsed,
+      user: { ...(parsed.user || {}), ...userPartial },
+      onboardingComplete:
+        userPartial.onboardingComplete !== undefined
+          ? userPartial.onboardingComplete
+          : parsed.onboardingComplete,
+    };
+    await write(sessionKey, JSON.stringify(updated));
+  } catch {}
+}
+
 export async function restoreSession(): Promise<Payload | null> {
   const saved = await read(sessionKey);
   if (!saved) return null;
+  let parsed: any;
   try {
-    const parsed = JSON.parse(saved);
+    parsed = JSON.parse(saved);
     if (
       typeof parsed.accessToken !== "string" ||
       typeof parsed.refreshToken !== "string"
     )
       throw new Error("Invalid session");
-    current = parsed;
+    current = {
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+    };
   } catch {
     await remove(sessionKey);
     return null;
@@ -144,6 +230,17 @@ export async function restoreSession(): Promise<Payload | null> {
       current = null;
       await remove(sessionKey);
       return null;
+    }
+    // If backend is temporarily unreachable on reload, recover using cached session
+    if (parsed.user) {
+      return {
+        accessToken: parsed.accessToken,
+        refreshToken: parsed.refreshToken,
+        user: parsed.user,
+        onboardingComplete: Boolean(
+          parsed.onboardingComplete ?? parsed.user?.onboardingComplete,
+        ),
+      };
     }
     throw error;
   }
