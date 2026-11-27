@@ -55,10 +55,10 @@ export function LoginScreen({
       </Text>
       <View style={{ gap: 14 }}>
         <Field
-          label="Gmail address"
+          label="Email address"
           value={email}
           onChange={setEmail}
-          placeholder="you@gmail.com"
+          placeholder="Enter your email address"
           keyboardType="email-address"
         />
         <Button
