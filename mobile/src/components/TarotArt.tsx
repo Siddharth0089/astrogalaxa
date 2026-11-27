@@ -1,5 +1,5 @@
 import React from "react";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 
 const arcanaShapes = [
   "M16 45L25 23 34 45M22 34h8 M25 14v4",
@@ -26,21 +26,56 @@ const arcanaShapes = [
   "M25 13a16 16 0 1 0 0 32a16 16 0 0 0 0-32z M17 29l5 5 11-12",
 ];
 
+// Minor Arcana Suit Symbols (Wands, Cups, Swords, Pentacles)
+const suitPaths: Record<string, string> = {
+  wands:
+    "M25 15v31 M25 15c-3.5 0-5-3-2-6c1.5 2 3.5 3.5 2 6z M22 23l-3-2 M28 31l3-2 M22 39l-3-2",
+  cups:
+    "M15 16h20c0 10-4 17-10 17S15 26 15 16z M25 33v10 M18 43h14 M17 21h16",
+  swords:
+    "M25 11v34 M22 17l3-6l3 6 M17 34h16 M21 45h8",
+  pentacles:
+    "M25 16l3.5 10.5H39l-8.5 6.2l3.2 10.5L25 36.8l-8.7 6.4l3.2-10.5L11 26.5h10.5z",
+};
+
 export function TarotArt({ artKey }: { artKey: string }) {
-  const index = Number(artKey.replace("major-", ""));
-  const path = arcanaShapes[index] ?? arcanaShapes[0];
+  const isMajor = artKey.startsWith("major-");
+  let path = arcanaShapes[0];
+  let showCircle = false;
+
+  if (isMajor) {
+    const index = Number(artKey.replace("major-", ""));
+    path = arcanaShapes[index] ?? arcanaShapes[0];
+  } else {
+    const suit = artKey.split("-")[0];
+    if (suit && suitPaths[suit]) {
+      path = suitPaths[suit];
+      if (suit === "pentacles") showCircle = true;
+    }
+  }
+
   return (
     <Svg
       viewBox="0 0 50 58"
-      width="65%"
-      height="55%"
+      width="68%"
+      height="56%"
       accessibilityLabel="Card illustration"
     >
+      {showCircle && (
+        <Circle
+          cx="25"
+          cy="29.5"
+          r="16.5"
+          fill="none"
+          stroke="#9B6B13"
+          strokeWidth="1.5"
+        />
+      )}
       <Path
         d={path}
         fill="none"
         stroke="#9B6B13"
-        strokeWidth="1.6"
+        strokeWidth="1.7"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

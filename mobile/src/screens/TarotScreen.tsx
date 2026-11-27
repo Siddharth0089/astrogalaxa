@@ -1,18 +1,23 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
+  Image,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { Button } from "../components/Button";
 import { Screen, TarotReading } from "../types";
 import { apiRequest } from "../../session";
 import { C, disclaimer } from "../theme/colors";
 import { s } from "../theme/styles";
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
 type SpreadMode = "daily" | "threeCard" | "yesNo";
 
@@ -40,11 +45,14 @@ export function TarotScreen({
   const [journal, setJournal] = useState<TarotReading[]>([]);
   const [journalLoading, setJournalLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [shuffling, setShuffling] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const shuffleAnim = useRef(new Animated.Value(0)).current;
+
+  const shuffleProgress = useRef(new Animated.Value(0)).current;
   const mounted = useRef(true);
+  const nativeDriver = Platform.OS !== "web";
 
   const targetCount = mode === "threeCard" ? 3 : 1;
 
@@ -92,25 +100,49 @@ export function TarotScreen({
   };
 
   const shuffleDeck = () => {
-    if (busy || loading) return;
+    if (busy || loading || shuffling) return;
     setCards([]);
+    setShuffling(true);
+
+    // Smooth riffle & fan animation
     Animated.sequence([
-      Animated.timing(shuffleAnim, {
+      Animated.timing(shuffleProgress, {
         toValue: 1,
-        duration: 350,
-        useNativeDriver: true,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: nativeDriver,
       }),
-      Animated.timing(shuffleAnim, {
+      Animated.timing(shuffleProgress, {
+        toValue: -1,
+        duration: 280,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: nativeDriver,
+      }),
+      Animated.spring(shuffleProgress, {
         toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
+        friction: 5,
+        tension: 45,
+        useNativeDriver: nativeDriver,
       }),
-    ]).start();
-    setRetry((x) => x + 1);
+    ]).start(() => {
+      if (mounted.current) {
+        setShuffling(false);
+        // Locally shuffle visible cards cleanly without losing responsiveness, then sync server deck
+        setDeck((prev) => {
+          const copy = [...prev];
+          for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+          }
+          return copy;
+        });
+        setRetry((x) => x + 1);
+      }
+    });
   };
 
   const choose = (id: string) => {
-    if (busy) return;
+    if (busy || shuffling) return;
     if (cards.includes(id)) {
       setCards(cards.filter((x) => x !== id));
     } else if (cards.length < targetCount) {
@@ -122,7 +154,6 @@ export function TarotScreen({
     if (cards.length !== targetCount || busy) return;
     setBusy(true);
     setError("");
-    // Randomize upright / reversed orientations for each drawn card
     const orientations = cards.map(() =>
       Math.random() > 0.3 ? "upright" : "reversed",
     );
@@ -139,7 +170,7 @@ export function TarotScreen({
         true,
         "POST",
       );
-      if (mounted.current) onReading(result);
+      if (mounted.current) onReading({ ...result, fromJournal: false });
     } catch (e) {
       if (mounted.current)
         setError(
@@ -151,16 +182,24 @@ export function TarotScreen({
   };
 
   return (
-    <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
-      {/* App Bar */}
+    <ScrollView
+      contentContainerStyle={[s.page, { paddingBottom: 100 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
       <View style={s.header}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Go back"
           onPress={() => onNavigate("home")}
-          style={s.back}
+          style={{
+            width: 40,
+            height: 40,
+            alignItems: "flex-start",
+            justifyContent: "center",
+          }}
         >
-          <Text style={s.backText}>‹</Text>
+          <Text style={[s.backText, { fontSize: 32, lineHeight: 34 }]}>‹</Text>
         </Pressable>
         <Text style={s.headerTitle}>Tarot Oracle</Text>
         <Pressable
@@ -176,7 +215,13 @@ export function TarotScreen({
             backgroundColor: viewJournal ? "rgba(243, 197, 86, 0.15)" : C.glass,
           }}
         >
-          <Text style={{ color: viewJournal ? C.gold : C.text, fontSize: 12, fontWeight: "600" }}>
+          <Text
+            style={{
+              color: viewJournal ? C.gold : C.text,
+              fontSize: 12,
+              fontWeight: "600",
+            }}
+          >
             {viewJournal ? "Draw Cards" : "Journal"}
           </Text>
         </Pressable>
@@ -205,10 +250,16 @@ export function TarotScreen({
             journal.map((item, idx) => (
               <Pressable
                 key={item._id || String(idx)}
-                onPress={() => onReading(item)}
+                onPress={() => onReading({ ...item, fromJournal: true })}
                 style={[s.card, { gap: 8, padding: 16 }]}
               >
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
                   <Text style={{ color: C.gold, fontWeight: "700", fontSize: 14 }}>
                     {item.mode === "daily"
                       ? "Daily Draw"
@@ -225,7 +276,7 @@ export function TarotScreen({
                 </View>
                 {item.question && (
                   <Text style={{ color: "#E0D7C6", fontStyle: "italic", fontSize: 13 }}>
-                    "{item.question}"
+                    &ldquo;{item.question}&rdquo;
                   </Text>
                 )}
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
@@ -311,10 +362,10 @@ export function TarotScreen({
             </Text>
             <Text style={s.sub}>
               {mode === "daily"
-                ? "Focus your energy and select 1 card to guide your day."
+                ? "Focus your energy and select 1 face-down card to reveal your day's guidance."
                 : mode === "yesNo"
-                  ? "Hold a direct question in your mind and pull 1 card for clarity."
-                  : "Think of your situation, breathe deeply, and choose the 3 cards that call to you."}
+                  ? "Hold a direct question in your mind and select 1 card to flip."
+                  : "Think of your situation, breathe deeply, and select the 3 cards that call to you."}
             </Text>
           </View>
 
@@ -374,7 +425,7 @@ export function TarotScreen({
                     },
                   ]}
                 >
-                  {cards[i] === undefined ? "Pick a card" : "✓ Selected"}
+                  {cards[i] === undefined ? "Pick a card" : "✓ Ready to flip"}
                 </Text>
               </View>
             ))}
@@ -396,85 +447,121 @@ export function TarotScreen({
               accessibilityRole="button"
               accessibilityLabel="Shuffle deck"
               onPress={shuffleDeck}
+              disabled={shuffling}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 4,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
+                gap: 5,
+                paddingHorizontal: 12,
+                paddingVertical: 7,
                 borderRadius: 10,
-                backgroundColor: "rgba(243, 197, 86, 0.12)",
+                backgroundColor: "rgba(243, 197, 86, 0.14)",
                 borderWidth: 1,
-                borderColor: "rgba(243, 197, 86, 0.3)",
+                borderColor: "rgba(243, 197, 86, 0.38)",
               }}
             >
               <Text style={{ fontSize: 13 }}>🔀</Text>
-              <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "600" }}>
-                Shuffle Deck
+              <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "700" }}>
+                {shuffling ? "Shuffling…" : "Shuffle Deck"}
               </Text>
             </Pressable>
           </View>
 
-          {/* Cards Grid with shuffle transform animation */}
+          {/* Face-Down Card Grid featuring custom cosmic card_back.png artwork & riffle shuffle animation */}
           {loading ? (
             <Text style={s.sub}>Preparing the 78-card deck…</Text>
           ) : (
-            <Animated.View
-              style={[
-                s.cardGrid,
-                {
-                  transform: [
-                    {
-                      scale: shuffleAnim.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [1, 0.95, 1],
-                      }),
-                    },
-                    {
-                      rotate: shuffleAnim.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: ["0deg", "3deg", "0deg"],
-                      }),
-                    },
-                  ],
-                },
-              ]}
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                justifyContent: "space-between",
+                rowGap: 14,
+              }}
             >
-              {deck.map((card, i) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Tarot card ${i + 1}`}
-                  accessibilityState={{ selected: cards.includes(card.id) }}
-                  onPress={() => choose(card.id)}
-                  key={card.id}
-                  style={[s.tarotBack, cards.includes(card.id) && s.selectedCard]}
-                >
-                  <Svg viewBox="0 0 50 70" width="80%" height="80%">
-                    <Rect
-                      x="3"
-                      y="3"
-                      width="44"
-                      height="64"
-                      rx="3"
-                      fill="none"
-                      stroke={cards.includes(card.id) ? C.onGold : C.gold}
-                    />
-                    <Circle
-                      cx="25"
-                      cy="31"
-                      r="9"
-                      fill="none"
-                      stroke={cards.includes(card.id) ? C.onGold : C.gold}
-                    />
-                    <Path
-                      d="M25 16v-5 M25 46v5 M10 31H5 M40 31h5 M14 20l-3-3 M36 42l3 3 M36 20l3-3 M14 42l-3 3"
-                      stroke={cards.includes(card.id) ? C.onGold : C.gold}
-                      strokeWidth="1.5"
-                    />
-                  </Svg>
-                </Pressable>
-              ))}
-            </Animated.View>
+              {deck.map((card, i) => {
+                const isSelected = cards.includes(card.id);
+                const direction = i % 2 === 0 ? 1 : -1;
+
+                const translateX = shuffleProgress.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [-12 * direction, 0, 14 * direction],
+                });
+                const rotateDeg = shuffleProgress.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [`${-6 * direction}deg`, "0deg", `${6 * direction}deg`],
+                });
+                const scaleShuffle = shuffleProgress.interpolate({
+                  inputRange: [-1, 0, 1],
+                  outputRange: [0.94, 1, 0.94],
+                });
+
+                return (
+                  <Animated.View
+                    key={card.id}
+                    style={{
+                      width: "23%",
+                      aspectRatio: 0.56,
+                      transform: [
+                        { translateX },
+                        { rotate: rotateDeg },
+                        { scale: isSelected ? 1.06 : scaleShuffle },
+                        { translateY: isSelected ? -5 : 0 },
+                      ],
+                    }}
+                  >
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Tarot card ${i + 1}`}
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => choose(card.id)}
+                      style={{
+                        flex: 1,
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        backgroundColor: "transparent",
+                        shadowColor: isSelected ? C.gold : undefined,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: isSelected ? 0.9 : 0,
+                        shadowRadius: isSelected ? 10 : 0,
+                        elevation: isSelected ? 8 : 0,
+                      }}
+                    >
+                      <Image
+                        source={CARD_BACK_IMAGE}
+                        style={{ width: "100%", height: "100%" }}
+                        resizeMode="contain"
+                      />
+                      {isSelected && (
+                        <View
+                          style={{
+                            position: "absolute",
+                            top: 5,
+                            right: 5,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: C.gold,
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: C.onGold,
+                              fontSize: 11,
+                              fontWeight: "800",
+                            }}
+                          >
+                            ✓
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  </Animated.View>
+                );
+              })}
+            </View>
           )}
 
           {!!error && (
@@ -487,12 +574,12 @@ export function TarotScreen({
           <Button
             label={
               busy
-                ? "Interpreting cards…"
+                ? "Drawing your cards…"
                 : cards.length === targetCount
-                  ? "Reveal my reading"
+                  ? "Continue to Flip Cards"
                   : `Pick ${targetCount - cards.length} card${targetCount - cards.length === 1 ? "" : "s"}`
             }
-            disabled={cards.length !== targetCount || busy || loading}
+            disabled={cards.length !== targetCount || busy || loading || shuffling}
             onPress={reveal}
           />
         </>

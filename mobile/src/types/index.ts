@@ -113,6 +113,7 @@ export type TarotReading = {
   }[];
   interpretation?: string;
   createdAt?: string;
+  fromJournal?: boolean;
 };
 
 export type Horoscope = {
