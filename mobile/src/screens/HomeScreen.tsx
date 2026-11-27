@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { ZodiacBadge } from "../components/ZodiacBadge";
 import { getZodiacSymbol, Horoscope, NameSign, Screen } from "../types";
 import { disclaimer } from "../theme/colors";
 import { s } from "../theme/styles";
@@ -47,10 +48,12 @@ export function HomeScreen({
         </Pressable>
       </View>
       <View style={s.card}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <Text style={{ fontSize: 36 }}>
-            {getZodiacSymbol(nameSign?.name || sunSign)}
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+          <ZodiacBadge
+            symbol={getZodiacSymbol(nameSign?.name || sunSign)}
+            size={52}
+            pulse={true}
+          />
           <View style={{ flex: 1 }}>
             <Text style={s.sign}>
               {nameSign
@@ -64,8 +67,9 @@ export function HomeScreen({
             </Text>
           </View>
         </View>
-        <Text style={[s.sub, { marginTop: 8 }]}>
-          Sun sign by birth date: {getZodiacSymbol(sunSign)} {sunSign ?? "Unavailable"}
+        <Text style={[s.sub, { marginTop: 10 }]}>
+          Sun sign by birth date: {getZodiacSymbol(sunSign)}{" "}
+          {sunSign ?? "Unavailable"}
         </Text>
       </View>
       <View style={[s.card, { backgroundColor: "#F5F5F7", gap: 12 }]}>
