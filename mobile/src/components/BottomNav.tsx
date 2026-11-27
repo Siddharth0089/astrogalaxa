@@ -119,11 +119,6 @@ export function BottomNav({
           borderColor: "rgba(243, 197, 86, 0.3)",
           paddingHorizontal: 8,
           alignItems: "center",
-          shadowColor: C.gold,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.2,
-          shadowRadius: 16,
-          elevation: 10,
           ...({ backdropFilter: "blur(16px)" } as object),
         }}
       >
