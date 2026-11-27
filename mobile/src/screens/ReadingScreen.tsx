@@ -440,26 +440,56 @@ export function ReadingScreen({
       contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 48, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Sacred Editorial Header */}
+      {/* Minimal Borderless Back Button + Sacred Editorial Header */}
       <View style={{ gap: 6 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <SparkleGlyph size={12} />
-          <Text
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t.backLabel}
+            onPress={onDrawAgain}
             style={{
-              color: C.gold,
-              fontSize: 11,
-              fontWeight: "700",
-              textTransform: "uppercase",
-              letterSpacing: 1.6,
+              width: 38,
+              height: 38,
+              alignItems: "flex-start",
+              justifyContent: "center",
             }}
           >
-            {reading.mode === "daily"
-              ? t.modes.daily
-              : isYesNo
-                ? t.modes.yesNo
-                : t.modes.threeCard}{" "}
-            • {localizedTopic}
-          </Text>
+            <Text
+              style={{
+                color: C.text,
+                fontSize: 34,
+                lineHeight: 36,
+                fontWeight: "300",
+              }}
+            >
+              ‹
+            </Text>
+          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+            <SparkleGlyph size={12} />
+            <Text
+              style={{
+                color: C.gold,
+                fontSize: 11,
+                fontWeight: "700",
+                textTransform: "uppercase",
+                letterSpacing: 1.6,
+              }}
+            >
+              {reading.mode === "daily"
+                ? t.modes.daily
+                : isYesNo
+                  ? t.modes.yesNo
+                  : t.modes.threeCard}{" "}
+              • {localizedTopic}
+            </Text>
+          </View>
         </View>
         <Text style={s.title}>
           {allFlipped ? t.titleDone : t.titleTurning}

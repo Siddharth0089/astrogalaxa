@@ -367,9 +367,23 @@ describe("tarot readings", () => {
       .get("/tarot/quota")
       .set("Authorization", `Bearer ${token}`);
     expect(quota.status).toBe(200);
-    expect(quota.body.data.maxDailyCards).toBe(3);
-    expect(quota.body.data.usedToday).toBe(3);
-    expect(quota.body.data.remainingToday).toBe(0);
+    expect(quota.body.data.byMode.threeCard.usedToday).toBe(3);
+    expect(quota.body.data.byMode.threeCard.remainingToday).toBe(0);
+    expect(quota.body.data.byMode.daily.remainingToday).toBe(3);
+    expect(quota.body.data.byMode.yesNo.remainingToday).toBe(3);
+    expect(
+      (
+        await request(app)
+          .post("/tarot/readings")
+          .set("Authorization", `Bearer ${token}`)
+          .send({
+            topic: "General",
+            mode: "threeCard",
+            cardIds: selection,
+          })
+      ).status,
+    ).toBe(429);
+    // Still able to draw in Daily Draw and Yes / No modes independently
     expect(
       (
         await request(app)
@@ -381,7 +395,19 @@ describe("tarot readings", () => {
             cardIds: [selection[0]],
           })
       ).status,
-    ).toBe(429);
+    ).toBe(201);
+    expect(
+      (
+        await request(app)
+          .post("/tarot/readings")
+          .set("Authorization", `Bearer ${token}`)
+          .send({
+            topic: "General",
+            mode: "yesNo",
+            cardIds: [selection[1]],
+          })
+      ).status,
+    ).toBe(201);
     const moneyReading = await request(app)
       .post("/tarot/readings")
       .set("Authorization", `Bearer ${otherToken}`)

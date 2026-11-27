@@ -609,17 +609,33 @@ async function getTarotDailyQuota(userId: string) {
     createdAt: { $gte: startOfDay },
   })
     .sort({ createdAt: -1 })
-    .select("_id cards")
+    .select("_id mode cards")
     .lean();
-  const usedToday = todaysReadings.reduce(
-    (sum, r) => sum + (Array.isArray(r.cards) ? r.cards.length : 0),
-    0,
-  );
-  const remainingToday = Math.max(0, MAX_DAILY_TAROT_CARDS - usedToday);
+
+  const byMode = {
+    threeCard: { maxDailyCards: MAX_DAILY_TAROT_CARDS, usedToday: 0, remainingToday: MAX_DAILY_TAROT_CARDS },
+    daily: { maxDailyCards: MAX_DAILY_TAROT_CARDS, usedToday: 0, remainingToday: MAX_DAILY_TAROT_CARDS },
+    yesNo: { maxDailyCards: MAX_DAILY_TAROT_CARDS, usedToday: 0, remainingToday: MAX_DAILY_TAROT_CARDS },
+  };
+  let usedTotal = 0;
+  for (const r of todaysReadings) {
+    const m = r.mode === "daily" || r.mode === "yesNo" ? r.mode : "threeCard";
+    const count = Array.isArray(r.cards) ? r.cards.length : 0;
+    byMode[m].usedToday += count;
+    usedTotal += count;
+  }
+  for (const m of ["threeCard", "daily", "yesNo"] as const) {
+    byMode[m].remainingToday = Math.max(
+      0,
+      byMode[m].maxDailyCards - byMode[m].usedToday,
+    );
+  }
+  const maxTotal = MAX_DAILY_TAROT_CARDS * 3;
   return {
-    maxDailyCards: MAX_DAILY_TAROT_CARDS,
-    usedToday,
-    remainingToday,
+    maxDailyCards: maxTotal,
+    usedToday: usedTotal,
+    remainingToday: Math.max(0, maxTotal - usedTotal),
+    byMode,
     todaysReadingId: todaysReadings[0]?._id?.toString() ?? null,
   };
 }
@@ -742,17 +758,18 @@ tarotRouter.post(
     const cards = await TarotCard.find({ _id: { $in: cardIds } });
     if (cards.length !== cardIds.length)
       throw new AppError(400, "INVALID_CARDS", "Choose valid cards");
+    const defaultMode = mode || (cardIds.length === 1 ? "daily" : "threeCard");
     const quota = await getTarotDailyQuota(req.userId!);
-    if (quota.usedToday + cardIds.length > quota.maxDailyCards) {
+    const modeQuota = quota.byMode[defaultMode];
+    if (modeQuota.usedToday + cardIds.length > modeQuota.maxDailyCards) {
       throw new AppError(
         429,
         "TAROT_DAILY_LIMIT",
-        quota.remainingToday === 0
-          ? "You have drawn all 3 daily Tarot cards for today. Revisit today's reading in your Journal or ask AI Pandit."
-          : `You have ${quota.remainingToday} card${quota.remainingToday === 1 ? "" : "s"} remaining today. Choose a 1-card spread or check back tomorrow.`,
+        modeQuota.remainingToday === 0
+          ? `You have completed today's ${defaultMode === "threeCard" ? "3-Card Spread" : defaultMode === "yesNo" ? "Yes / No" : "Daily Draw"} allowance. You can still draw in your other Tarot modes or revisit today's Journal.`
+          : `You have ${modeQuota.remainingToday} card${modeQuota.remainingToday === 1 ? "" : "s"} remaining in this mode today.`,
       );
     }
-    const defaultMode = mode || (cardIds.length === 1 ? "daily" : "threeCard");
     const positions =
       cardIds.length === 1
         ? ["Focus"]

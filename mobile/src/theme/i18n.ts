@@ -212,8 +212,17 @@ export function getCopy(language: Language = "English") {
         shuffling: "मिलाया जा रहा है…",
         loadingDeck: "78 कार्ड का डेक तैयार हो रहा है…",
         retryBtn: "पुनः प्रयास करें",
+        swipeHint: (needed: number) =>
+          `← डेक स्लाइड करें और अपने ${needed} कार्ड चुनें →`,
+        modeDoneTitle: (modeName: string) =>
+          `${modeName}: आज का कोटा पूरा`,
+        modeDoneBody:
+          "इस सेक्शन में आज की सीमा पूरी हो गई है — आप अन्य दो सेक्शन में अभी भी कार्ड चुन सकते हैं।",
+        modeQuotaLeft: (rem: number, max: number, modeName: string) =>
+          `${modeName}: आज ${max} में से ${rem} शेष`,
       },
       reading: {
+        backLabel: "टैरो डेक पर वापस जाएं",
         modes: {
           daily: "दैनिक कार्ड",
           yesNo: "हाँ / नहीं उत्तर",
@@ -443,8 +452,17 @@ export function getCopy(language: Language = "English") {
         shuffling: "Shuffling…",
         loadingDeck: "78-card deck taiyaar ho raha hai…",
         retryBtn: "Retry",
+        swipeHint: (needed: number) =>
+          `← Deck slide karein aur apna ${needed} card chunein →`,
+        modeDoneTitle: (modeName: string) =>
+          `${modeName} Aaj Pure Hue`,
+        modeDoneBody:
+          "Is section ki aaj ki limit complete hai — aap abhi bhi baaki Tarot sections me card draw kar sakte hain.",
+        modeQuotaLeft: (rem: number, max: number, modeName: string) =>
+          `${modeName}: aaj ${max} me se ${rem} baaki`,
       },
       reading: {
+        backLabel: "Back to Tarot Sanctuary",
         modes: {
           daily: "Daily Card Draw",
           yesNo: "Yes / No Oracle",
@@ -673,8 +691,17 @@ export function getCopy(language: Language = "English") {
       shuffling: "Shuffling…",
       loadingDeck: "Preparing your 78-card deck…",
       retryBtn: "Retry",
+      swipeHint: (needed: number) =>
+        `← Slide across the spread & tap ${needed} card${needed === 1 ? "" : "s"} →`,
+      modeDoneTitle: (modeName: string) =>
+        `${modeName} Complete for Today`,
+      modeDoneBody:
+        "You have completed today's allowance for this mode — you can still draw cards in your other Tarot sections.",
+      modeQuotaLeft: (rem: number, max: number, modeName: string) =>
+        `${modeName}: ${rem} of ${max} remaining today`,
     },
     reading: {
+      backLabel: "Back to Tarot Sanctuary",
       modes: {
         daily: "Daily Card Draw",
         yesNo: "Yes / No Oracle",
