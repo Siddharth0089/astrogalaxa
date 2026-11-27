@@ -21,6 +21,13 @@ const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
 type SpreadMode = "daily" | "threeCard" | "yesNo";
 
+type TarotQuota = {
+  maxDailyCards: number;
+  usedToday: number;
+  remainingToday: number;
+  todaysReadingId: string | null;
+};
+
 export function TarotScreen({
   cards,
   setCards,
@@ -39,6 +46,7 @@ export function TarotScreen({
   onNavigate: (s: Screen) => void;
 }) {
   const [deck, setDeck] = useState<{ id: string }[]>([]);
+  const [quota, setQuota] = useState<TarotQuota | null>(null);
   const [mode, setMode] = useState<SpreadMode>("threeCard");
   const [question, setQuestion] = useState("");
   const [viewJournal, setViewJournal] = useState(false);
@@ -55,6 +63,24 @@ export function TarotScreen({
   const nativeDriver = Platform.OS !== "web";
 
   const targetCount = mode === "threeCard" ? 3 : 1;
+  const remainingToday = quota?.remainingToday ?? 3;
+  const maxDailyCards = quota?.maxDailyCards ?? 3;
+  const quotaExhausted = quota !== null && remainingToday === 0;
+  const spreadExceedsQuota = quota !== null && targetCount > remainingToday;
+
+  const refreshQuota = async () => {
+    try {
+      const q: TarotQuota = await apiRequest("/tarot/quota", undefined, true);
+      if (mounted.current) {
+        setQuota(q);
+        if (q.remainingToday > 0 && q.remainingToday < 3) {
+          setMode((prev) => (prev === "threeCard" ? "daily" : prev));
+        }
+      }
+    } catch {
+      // Preserve current deck state if quota endpoint fails silently
+    }
+  };
 
   useEffect(() => {
     mounted.current = true;
@@ -68,9 +94,19 @@ export function TarotScreen({
     }
     setLoading(true);
     setError("");
-    apiRequest("/tarot/cards", undefined, true)
-      .then((result: { id: string }[]) => {
-        if (mounted.current) setDeck(result);
+    Promise.all([
+      apiRequest("/tarot/cards?all=true", undefined, true),
+      apiRequest("/tarot/quota", undefined, true).catch(() => null),
+    ])
+      .then(([deckResult, quotaResult]: [{ id: string }[], TarotQuota | null]) => {
+        if (!mounted.current) return;
+        setDeck(Array.isArray(deckResult) ? deckResult : []);
+        if (quotaResult) {
+          setQuota(quotaResult);
+          if (quotaResult.remainingToday > 0 && quotaResult.remainingToday < 3) {
+            setMode((prev) => (prev === "threeCard" ? "daily" : prev));
+          }
+        }
       })
       .catch((e) => {
         if (mounted.current)
@@ -100,21 +136,21 @@ export function TarotScreen({
   };
 
   const shuffleDeck = () => {
-    if (busy || loading || shuffling) return;
+    if (busy || loading || shuffling || deck.length === 0) return;
     setCards([]);
     setShuffling(true);
 
-    // Smooth riffle & fan animation
+    // Smooth riffle & fan animation with in-place 78-card Fisher-Yates shuffle (no full-screen reload)
     Animated.sequence([
       Animated.timing(shuffleProgress, {
         toValue: 1,
-        duration: 280,
+        duration: 260,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: nativeDriver,
       }),
       Animated.timing(shuffleProgress, {
         toValue: -1,
-        duration: 280,
+        duration: 260,
         easing: Easing.inOut(Easing.sin),
         useNativeDriver: nativeDriver,
       }),
@@ -126,8 +162,6 @@ export function TarotScreen({
       }),
     ]).start(() => {
       if (mounted.current) {
-        setShuffling(false);
-        // Locally shuffle visible cards cleanly without losing responsiveness, then sync server deck
         setDeck((prev) => {
           const copy = [...prev];
           for (let i = copy.length - 1; i > 0; i--) {
@@ -136,13 +170,13 @@ export function TarotScreen({
           }
           return copy;
         });
-        setRetry((x) => x + 1);
+        setShuffling(false);
       }
     });
   };
 
   const choose = (id: string) => {
-    if (busy || shuffling) return;
+    if (busy || shuffling || quotaExhausted || spreadExceedsQuota) return;
     if (cards.includes(id)) {
       setCards(cards.filter((x) => x !== id));
     } else if (cards.length < targetCount) {
@@ -151,7 +185,13 @@ export function TarotScreen({
   };
 
   const reveal = async () => {
-    if (cards.length !== targetCount || busy) return;
+    if (
+      cards.length !== targetCount ||
+      busy ||
+      quotaExhausted ||
+      spreadExceedsQuota
+    )
+      return;
     setBusy(true);
     setError("");
     const orientations = cards.map(() =>
@@ -170,12 +210,26 @@ export function TarotScreen({
         true,
         "POST",
       );
-      if (mounted.current) onReading({ ...result, fromJournal: false });
+      if (mounted.current) {
+        setQuota((prev) =>
+          prev
+            ? {
+                ...prev,
+                usedToday: prev.usedToday + cards.length,
+                remainingToday: Math.max(0, prev.remainingToday - cards.length),
+                todaysReadingId: result._id || prev.todaysReadingId,
+              }
+            : prev,
+        );
+        onReading({ ...result, fromJournal: false });
+      }
     } catch (e) {
-      if (mounted.current)
+      if (mounted.current) {
         setError(
           e instanceof Error ? e.message : "Could not save your reading.",
         );
+        void refreshQuota();
+      }
     } finally {
       if (mounted.current) setBusy(false);
     }
@@ -183,43 +237,84 @@ export function TarotScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingBottom: 100 }]}
+      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 100, gap: 16 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={s.header}>
+      {/* Spiritual Editorial Header (No App Bar or Back Button) */}
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 12,
+        }}
+      >
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text
+            style={{
+              color: C.gold,
+              fontSize: 11,
+              fontWeight: "700",
+              letterSpacing: 1.8,
+              textTransform: "uppercase",
+            }}
+          >
+            ✦ Sacred Tarot · {deck.length || 78}-Card Arcana
+          </Text>
+          <Text style={s.title}>
+            {viewJournal ? "Reading Journal" : "Tarot Sanctuary"}
+          </Text>
+          {quota && !viewJournal && (
+            <View
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: quotaExhausted
+                  ? "rgba(255, 180, 171, 0.35)"
+                  : "rgba(243, 197, 86, 0.35)",
+                backgroundColor: quotaExhausted
+                  ? "rgba(255, 180, 171, 0.1)"
+                  : "rgba(243, 197, 86, 0.1)",
+              }}
+            >
+              <Text
+                style={{
+                  color: quotaExhausted ? "#FFB4AB" : "#F6E7B8",
+                  fontSize: 11,
+                  fontWeight: "700",
+                }}
+              >
+                {quotaExhausted
+                  ? `0 of ${maxDailyCards} daily cards remaining today`
+                  : `${remainingToday} of ${maxDailyCards} daily cards left today`}
+              </Text>
+            </View>
+          )}
+        </View>
+
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => onNavigate("home")}
-          style={{
-            width: 40,
-            height: 40,
-            alignItems: "flex-start",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={[s.backText, { fontSize: 32, lineHeight: 34 }]}>‹</Text>
-        </Pressable>
-        <Text style={s.headerTitle}>Tarot Oracle</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="View Journal"
+          accessibilityLabel={viewJournal ? "Back to deck" : "View Journal"}
           onPress={viewJournal ? () => setViewJournal(false) : loadJournal}
           style={{
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 10,
+            marginTop: 4,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 12,
             borderWidth: 1,
             borderColor: viewJournal ? C.gold : C.border,
-            backgroundColor: viewJournal ? "rgba(243, 197, 86, 0.15)" : C.glass,
+            backgroundColor: viewJournal ? "rgba(243, 197, 86, 0.16)" : C.glass,
           }}
         >
           <Text
             style={{
               color: viewJournal ? C.gold : C.text,
               fontSize: 12,
-              fontWeight: "600",
+              fontWeight: "700",
             }}
           >
             {viewJournal ? "Draw Cards" : "Journal"}
@@ -230,7 +325,6 @@ export function TarotScreen({
       {viewJournal ? (
         /* Reading Journal History */
         <View style={{ gap: 14 }}>
-          <Text style={s.title}>Your Reading Journal</Text>
           <Text style={s.sub}>
             Revisit your previous tarot draws, cards, and personalized insights over time.
           </Text>
@@ -303,22 +397,87 @@ export function TarotScreen({
       ) : (
         /* Card Drawing Experience */
         <>
+          {quotaExhausted && (
+            <View
+              style={[
+                s.card,
+                {
+                  padding: 18,
+                  gap: 10,
+                  borderColor: "rgba(243, 197, 86, 0.35)",
+                  backgroundColor: "rgba(243, 197, 86, 0.06)",
+                },
+              ]}
+            >
+              <Text style={{ color: C.gold, fontSize: 15, fontWeight: "700" }}>
+                ✨ Daily 3-Card Sanctuary Complete
+              </Text>
+              <Text style={[s.sub, { lineHeight: 20 }]}>
+                You have drawn all 3 daily cards for today to keep your guidance centered and clear. Fresh draws unlock at midnight.
+              </Text>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={loadJournal}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 11,
+                    borderRadius: 12,
+                    backgroundColor: C.gold,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: C.onGold, fontWeight: "700", fontSize: 13 }}>
+                    Open Today&apos;s Journal
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => onNavigate("chat")}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 11,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: "rgba(243, 197, 86, 0.4)",
+                    backgroundColor: C.glass,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ color: C.text, fontWeight: "600", fontSize: 13 }}>
+                    Ask AI Pandit
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
           {/* Spread Mode Selector */}
           <View style={{ gap: 8 }}>
             <Text style={s.label}>Spread Mode</Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
               {(
                 [
-                  { id: "threeCard" as const, label: "3-Card Spread", icon: "✨" },
-                  { id: "daily" as const, label: "Daily Draw", icon: "☀️" },
-                  { id: "yesNo" as const, label: "Yes / No", icon: "⚖️" },
+                  { id: "threeCard" as const, label: "3-Card Spread", icon: "✨", need: 3 },
+                  { id: "daily" as const, label: "Daily Draw", icon: "☀️", need: 1 },
+                  { id: "yesNo" as const, label: "Yes / No", icon: "⚖️", need: 1 },
                 ] as const
               ).map((m) => {
                 const isSelected = mode === m.id;
+                const locked = quota !== null && m.need > remainingToday;
                 return (
                   <Pressable
                     key={m.id}
                     onPress={() => {
+                      if (locked) {
+                        setError(
+                          remainingToday === 0
+                            ? "Daily 3-card limit reached for today. Visit your Journal or ask AI Pandit."
+                            : `Only ${remainingToday} daily card${remainingToday === 1 ? "" : "s"} left today — choose Daily Draw or Yes / No.`,
+                        );
+                        return;
+                      }
+                      setError("");
                       setMode(m.id);
                       setCards([]);
                     }}
@@ -333,6 +492,7 @@ export function TarotScreen({
                       borderWidth: 1,
                       borderColor: isSelected ? C.gold : C.border,
                       backgroundColor: isSelected ? C.gold : C.glass,
+                      opacity: locked ? 0.45 : 1,
                     }}
                   >
                     <Text style={{ fontSize: 14 }}>{m.icon}</Text>
@@ -353,7 +513,7 @@ export function TarotScreen({
 
           {/* Heading */}
           <View style={{ gap: 4 }}>
-            <Text style={s.title}>
+            <Text style={s.cardTitle}>
               {mode === "daily"
                 ? "Daily Card Draw"
                 : mode === "yesNo"
@@ -377,6 +537,7 @@ export function TarotScreen({
               onChangeText={setQuestion}
               placeholder="e.g. What energy is surrounding my career transition?"
               placeholderTextColor={C.muted}
+              editable={!quotaExhausted}
               style={{
                 backgroundColor: C.glass,
                 borderWidth: 1,
@@ -441,13 +602,13 @@ export function TarotScreen({
             }}
           >
             <Text style={[s.helper, { marginVertical: 0 }]}>
-              {cards.length} of {targetCount} selected • 78-card deck
+              {cards.length} of {targetCount} selected • {deck.length}-card deck
             </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Shuffle deck"
               onPress={shuffleDeck}
-              disabled={shuffling}
+              disabled={shuffling || loading || deck.length === 0}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -467,16 +628,23 @@ export function TarotScreen({
             </Pressable>
           </View>
 
-          {/* Face-Down Card Grid featuring custom cosmic card_back.png artwork & riffle shuffle animation */}
+          {/* All 78 Face-Down Cards featuring custom cosmic card_back.png artwork & in-place riffle animation */}
           {loading ? (
             <Text style={s.sub}>Preparing the 78-card deck…</Text>
+          ) : deck.length === 0 ? (
+            <View style={[s.card, { alignItems: "center", padding: 18, gap: 10 }]}>
+              <Text style={[s.sub, { textAlign: "center" }]}>
+                {error || "Unable to load the Tarot deck right now."}
+              </Text>
+              <Button label="Retry" onPress={() => setRetry((x) => x + 1)} />
+            </View>
           ) : (
             <View
               style={{
                 flexDirection: "row",
                 flexWrap: "wrap",
                 justifyContent: "space-between",
-                rowGap: 14,
+                rowGap: 8,
               }}
             >
               {deck.map((card, i) => {
@@ -485,7 +653,7 @@ export function TarotScreen({
 
                 const translateX = shuffleProgress.interpolate({
                   inputRange: [-1, 0, 1],
-                  outputRange: [-12 * direction, 0, 14 * direction],
+                  outputRange: [-10 * direction, 0, 12 * direction],
                 });
                 const rotateDeg = shuffleProgress.interpolate({
                   inputRange: [-1, 0, 1],
@@ -500,31 +668,35 @@ export function TarotScreen({
                   <Animated.View
                     key={card.id}
                     style={{
-                      width: "23%",
+                      width: "15.2%",
                       aspectRatio: 0.56,
                       transform: [
                         { translateX },
                         { rotate: rotateDeg },
-                        { scale: isSelected ? 1.06 : scaleShuffle },
-                        { translateY: isSelected ? -5 : 0 },
+                        { scale: isSelected ? 1.08 : scaleShuffle },
+                        { translateY: isSelected ? -4 : 0 },
                       ],
                     }}
                   >
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Tarot card ${i + 1}`}
-                      accessibilityState={{ selected: isSelected }}
+                      accessibilityState={{
+                        selected: isSelected,
+                        disabled: quotaExhausted || spreadExceedsQuota,
+                      }}
                       onPress={() => choose(card.id)}
                       style={{
                         flex: 1,
-                        borderRadius: 10,
+                        borderRadius: 7,
                         overflow: "hidden",
                         backgroundColor: "transparent",
+                        opacity: quotaExhausted || spreadExceedsQuota ? 0.55 : 1,
                         shadowColor: isSelected ? C.gold : undefined,
                         shadowOffset: { width: 0, height: 0 },
                         shadowOpacity: isSelected ? 0.9 : 0,
-                        shadowRadius: isSelected ? 10 : 0,
-                        elevation: isSelected ? 8 : 0,
+                        shadowRadius: isSelected ? 8 : 0,
+                        elevation: isSelected ? 6 : 0,
                       }}
                     >
                       <Image
@@ -536,11 +708,11 @@ export function TarotScreen({
                         <View
                           style={{
                             position: "absolute",
-                            top: 5,
-                            right: 5,
-                            width: 20,
-                            height: 20,
-                            borderRadius: 10,
+                            top: 3,
+                            right: 3,
+                            width: 16,
+                            height: 16,
+                            borderRadius: 8,
                             backgroundColor: C.gold,
                             alignItems: "center",
                             justifyContent: "center",
@@ -549,7 +721,7 @@ export function TarotScreen({
                           <Text
                             style={{
                               color: C.onGold,
-                              fontSize: 11,
+                              fontSize: 9,
                               fontWeight: "800",
                             }}
                           >
@@ -573,13 +745,22 @@ export function TarotScreen({
           {/* Primary Action Button */}
           <Button
             label={
-              busy
-                ? "Drawing your cards…"
-                : cards.length === targetCount
-                  ? "Continue to Flip Cards"
-                  : `Pick ${targetCount - cards.length} card${targetCount - cards.length === 1 ? "" : "s"}`
+              quotaExhausted
+                ? "Daily Limit Reached (3 / 3 Today)"
+                : busy
+                  ? "Drawing your cards…"
+                  : cards.length === targetCount
+                    ? "Continue to Flip Cards"
+                    : `Pick ${targetCount - cards.length} card${targetCount - cards.length === 1 ? "" : "s"}`
             }
-            disabled={cards.length !== targetCount || busy || loading || shuffling}
+            disabled={
+              quotaExhausted ||
+              spreadExceedsQuota ||
+              cards.length !== targetCount ||
+              busy ||
+              loading ||
+              shuffling
+            }
             onPress={reveal}
           />
         </>

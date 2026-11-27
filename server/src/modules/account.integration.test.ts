@@ -347,6 +347,30 @@ describe("tarot readings", () => {
           })
       ).status,
     ).toBe(400);
+    const fullDeck = await request(app)
+      .get("/tarot/cards?all=true")
+      .set("Authorization", `Bearer ${token}`);
+    expect(fullDeck.status).toBe(200);
+    expect(fullDeck.body.data).toHaveLength(78);
+    const quota = await request(app)
+      .get("/tarot/quota")
+      .set("Authorization", `Bearer ${token}`);
+    expect(quota.status).toBe(200);
+    expect(quota.body.data.maxDailyCards).toBe(3);
+    expect(quota.body.data.usedToday).toBe(3);
+    expect(quota.body.data.remainingToday).toBe(0);
+    expect(
+      (
+        await request(app)
+          .post("/tarot/readings")
+          .set("Authorization", `Bearer ${token}`)
+          .send({
+            topic: "General",
+            mode: "daily",
+            cardIds: [selection[0]],
+          })
+      ).status,
+    ).toBe(429);
   });
 });
 

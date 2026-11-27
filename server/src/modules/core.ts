@@ -2,7 +2,9 @@ import { Router } from "express";
 import { z } from "zod";
 import mongoose from "mongoose";
 import { createHash, randomInt } from "node:crypto";
+import { DateTime } from "luxon";
 import { env } from "../common/config.js";
+import { tarotContent } from "../seeds/tarot-content.js";
 import {
   Astrologer,
   AstrologerSubscription,
@@ -418,10 +420,54 @@ publicRouter.get(
 );
 export const tarotRouter = Router();
 tarotRouter.use(requireAuth);
+
+const MAX_DAILY_TAROT_CARDS = 3;
+
+async function getTarotDailyQuota(userId: string) {
+  const u = await User.findById(userId)
+    .select("prefs.timezone birth.timezone")
+    .lean();
+  const rawTz = u?.prefs?.timezone || u?.birth?.timezone || "UTC";
+  const zone = DateTime.now().setZone(rawTz).isValid ? rawTz : "UTC";
+  const startOfDay = DateTime.now().setZone(zone).startOf("day").toJSDate();
+  const todaysReadings = await TarotReading.find({
+    userId,
+    createdAt: { $gte: startOfDay },
+  })
+    .sort({ createdAt: -1 })
+    .select("_id cards")
+    .lean();
+  const usedToday = todaysReadings.reduce(
+    (sum, r) => sum + (Array.isArray(r.cards) ? r.cards.length : 0),
+    0,
+  );
+  const remainingToday = Math.max(0, MAX_DAILY_TAROT_CARDS - usedToday);
+  return {
+    maxDailyCards: MAX_DAILY_TAROT_CARDS,
+    usedToday,
+    remainingToday,
+    todaysReadingId: todaysReadings[0]?._id?.toString() ?? null,
+  };
+}
+
 tarotRouter.get(
   "/cards",
-  asyncRoute(async (_req, res) => {
-    const cards = await TarotCard.find().sort({ number: 1 }).lean();
+  asyncRoute(async (req, res) => {
+    const showAll = req.query.all === "true";
+    let cards = await TarotCard.find().sort({ number: 1 }).lean();
+    if (showAll && cards.length < tarotContent.length) {
+      await TarotCard.bulkWrite(
+        tarotContent.map((card) => ({
+          updateOne: {
+            filter: { number: card.number },
+            update: { $setOnInsert: card },
+            upsert: true,
+          },
+        })),
+        { ordered: false },
+      );
+      cards = await TarotCard.find().sort({ number: 1 }).lean();
+    }
     if (cards.length < 8)
       throw new AppError(
         503,
@@ -432,10 +478,17 @@ tarotRouter.get(
       const j = randomInt(i + 1);
       [cards[i], cards[j]] = [cards[j], cards[i]];
     }
+    const selected = showAll ? cards : cards.slice(0, 8);
     ok(
       res,
-      cards.slice(0, 8).map((card) => ({ id: card._id.toString() })),
+      selected.map((card) => ({ id: card._id.toString() })),
     );
+  }),
+);
+tarotRouter.get(
+  "/quota",
+  asyncRoute(async (req: AuthRequest, res) => {
+    ok(res, await getTarotDailyQuota(req.userId!));
   }),
 );
 tarotRouter.get(
@@ -475,6 +528,16 @@ tarotRouter.post(
     const cards = await TarotCard.find({ _id: { $in: cardIds } });
     if (cards.length !== cardIds.length)
       throw new AppError(400, "INVALID_CARDS", "Choose valid cards");
+    const quota = await getTarotDailyQuota(req.userId!);
+    if (quota.usedToday + cardIds.length > quota.maxDailyCards) {
+      throw new AppError(
+        429,
+        "TAROT_DAILY_LIMIT",
+        quota.remainingToday === 0
+          ? "You have drawn all 3 daily Tarot cards for today. Revisit today's reading in your Journal or ask AI Pandit."
+          : `You have ${quota.remainingToday} card${quota.remainingToday === 1 ? "" : "s"} remaining today. Choose a 1-card spread or check back tomorrow.`,
+      );
+    }
     const defaultMode = mode || (cardIds.length === 1 ? "daily" : "threeCard");
     const positions =
       cardIds.length === 1
