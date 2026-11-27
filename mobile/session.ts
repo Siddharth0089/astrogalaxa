@@ -12,6 +12,8 @@ const deviceKey = "nakshatra_device_id";
 export type UserProfile = {
   id?: string;
   name?: string;
+  gender?: "male" | "female" | "other" | null;
+  language?: "English" | "Hindi" | "Hinglish";
   nameSign?: unknown;
   sunSign?: string;
   onboardingComplete?: boolean;

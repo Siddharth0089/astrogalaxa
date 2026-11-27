@@ -46,9 +46,14 @@ export function getZodiacSymbol(signName?: string | null): string {
   return ZODIAC_SYMBOLS[signName] || "✨";
 }
 
+export type Gender = "male" | "female" | "other";
+export type Language = "English" | "Hindi" | "Hinglish";
+
 export type UserProfile = {
   name?: string;
   email?: string;
+  gender?: Gender | null;
+  language?: Language;
   nameSign?: NameSign | null;
   sunSign?: string | null;
   birth?: {
@@ -60,6 +65,7 @@ export type UserProfile = {
     timezone: string;
   };
   prefs?: {
+    language?: Language;
     dailyHoroscope?: boolean;
     astrologerOnline?: boolean;
     chat?: boolean;

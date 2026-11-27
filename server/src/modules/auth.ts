@@ -48,6 +48,8 @@ const publicUser = (u: any) => ({
   id: u.id,
   email: u.email,
   name: u.name,
+  gender: u.gender ?? null,
+  language: u.language || u.prefs?.language || "English",
   onboardingComplete: u.onboardingComplete,
   birth: u.birth,
   nameSign: u.nameSign,

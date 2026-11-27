@@ -58,6 +58,8 @@ export default function App() {
   const [code, setCode] = useState("");
   const [token, setToken] = useState<string | undefined>();
   const [name, setName] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other">("male");
+  const [language, setLanguage] = useState<"English" | "Hindi" | "Hinglish">("English");
   const [birth, setBirth] = useState({ dob: "", time: "", place: "" });
   const [cards, setCards] = useState<string[]>([]);
   const [topic, setTopic] = useState("General");
@@ -96,6 +98,8 @@ export default function App() {
         if (!active || !session) return;
         setToken(session.accessToken);
         setName(session.user?.name ?? "");
+        setGender(session.user?.gender ?? "male");
+        setLanguage(session.user?.language ?? "English");
         setEmail(session.user?.email ?? "");
         setNameSign((session.user?.nameSign as NameSign | null) ?? null);
         setSunSign(session.user?.sunSign ?? null);
@@ -290,20 +294,32 @@ export default function App() {
         "Complete all required fields",
         "Please enter your name, date of birth, and birth city or location.",
       );
-    const match = /^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/.exec(birth.dob);
-    if (!match)
+    let day: number, month: number, year: number;
+    const dmy = /^(\d{1,2})[\s/.-]+(\d{1,2})[\s/.-]+(\d{4})$/.exec(
+      birth.dob.trim(),
+    );
+    const ymd = /^(\d{4})[\s/.-]+(\d{1,2})[\s/.-]+(\d{1,2})$/.exec(
+      birth.dob.trim(),
+    );
+    if (dmy) {
+      day = Number(dmy[1]);
+      month = Number(dmy[2]);
+      year = Number(dmy[3]);
+    } else if (ymd) {
+      year = Number(ymd[1]);
+      month = Number(ymd[2]);
+      day = Number(ymd[3]);
+    } else {
       return Alert.alert(
         "Invalid date",
-        "Enter your date of birth as DD / MM / YYYY.",
+        "Enter your date of birth as DD / MM / YYYY or YYYY-MM-DD.",
       );
-    const [, day, month, year] = match;
-    const date = new Date(
-      Date.UTC(Number(year), Number(month) - 1, Number(day)),
-    );
+    }
+    const date = new Date(Date.UTC(year, month - 1, day));
     if (
-      date.getUTCFullYear() !== Number(year) ||
-      date.getUTCMonth() !== Number(month) - 1 ||
-      date.getUTCDate() !== Number(day) ||
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day ||
       date > new Date()
     )
       return Alert.alert(
@@ -346,6 +362,8 @@ export default function App() {
         "/users/me",
         {
           name,
+          gender,
+          language,
           birth: {
             dob: date.toISOString(),
             time,
@@ -362,6 +380,8 @@ export default function App() {
       setSunSign(updated.sunSign ?? null);
       await updateSessionUser({
         name,
+        gender,
+        language,
         birth: {
           dob: date.toISOString(),
           time,
@@ -510,6 +530,10 @@ export default function App() {
       <BirthDetailsScreen
         name={name}
         setName={setName}
+        gender={gender}
+        setGender={setGender}
+        language={language}
+        setLanguage={setLanguage}
         birth={birth}
         setBirth={setBirth}
         selectedPlace={selectedPlace}

@@ -2,13 +2,17 @@ import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
-import { Place } from "../types";
+import { Gender, Language, Place } from "../types";
 import { C } from "../theme/colors";
 import { s } from "../theme/styles";
 
 export function BirthDetailsScreen({
   name,
   setName,
+  gender,
+  setGender,
+  language,
+  setLanguage,
   birth,
   setBirth,
   selectedPlace,
@@ -21,8 +25,14 @@ export function BirthDetailsScreen({
 }: {
   name: string;
   setName: (n: string) => void;
+  gender: Gender;
+  setGender: (g: Gender) => void;
+  language: Language;
+  setLanguage: (l: Language) => void;
   birth: { dob: string; time: string; place: string };
-  setBirth: React.Dispatch<React.SetStateAction<{ dob: string; time: string; place: string }>>;
+  setBirth: React.Dispatch<
+    React.SetStateAction<{ dob: string; time: string; place: string }>
+  >;
   selectedPlace: Place | null;
   setSelectedPlace: (p: Place | null) => void;
   places: Place[];
@@ -36,7 +46,9 @@ export function BirthDetailsScreen({
   // Parse initial time if exists (e.g. "06:40 AM" or "14:30")
   const parsedTime = useMemo(() => {
     if (!birth.time) return { h: "", m: "", p: "AM" as "AM" | "PM" };
-    const m12 = /^(0?[1-9]|1[0-2])\s*:\s*([0-5]\d)\s*(AM|PM)$/i.exec(birth.time.trim());
+    const m12 = /^(0?[1-9]|1[0-2])\s*:\s*([0-5]\d)\s*(AM|PM)$/i.exec(
+      birth.time.trim(),
+    );
     if (m12) {
       return {
         h: m12[1].padStart(2, "0"),
@@ -94,13 +106,115 @@ export function BirthDetailsScreen({
         placeholder="Your full name"
       />
 
+      {/* Gender Selection */}
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>Gender</Text>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {(
+            [
+              { id: "male", label: "Male", icon: "👨" },
+              { id: "female", label: "Female", icon: "👩" },
+              { id: "other", label: "Other", icon: "✨" },
+            ] as const
+          ).map((item) => {
+            const isSelected = gender === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Select gender ${item.label}`}
+                onPress={() => setGender(item.id)}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isSelected ? C.gold : C.border,
+                  backgroundColor: isSelected ? C.gold : C.glass,
+                }}
+              >
+                <Text style={{ fontSize: 16 }}>{item.icon}</Text>
+                <Text
+                  style={{
+                    color: isSelected ? C.onGold : C.text,
+                    fontWeight: isSelected ? "700" : "500",
+                    fontSize: 14,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={s.helper}>
+          Useful for personalized wording and Kundli Matching (Gun Milan).
+        </Text>
+      </View>
+
+      {/* Preferred Language Selection */}
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>Preferred Language</Text>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {(
+            [
+              { id: "English", label: "English" },
+              { id: "Hindi", label: "हिन्दी" },
+              { id: "Hinglish", label: "Hinglish" },
+            ] as const
+          ).map((item) => {
+            const isSelected = language === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Select preferred language ${item.label}`}
+                onPress={() => setLanguage(item.id)}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isSelected ? C.gold : C.border,
+                  backgroundColor: isSelected ? C.gold : C.glass,
+                }}
+              >
+                <Text
+                  style={{
+                    color: isSelected ? C.onGold : C.text,
+                    fontWeight: isSelected ? "700" : "600",
+                    fontSize: 14,
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={s.helper}>
+          Your AI Pandit replies in your chosen language comfort zone.
+        </Text>
+      </View>
+
       {/* Date of Birth */}
-      <Field
-        label="Date of birth"
-        value={birth.dob}
-        onChange={(x) => setBirth({ ...birth, dob: x })}
-        placeholder="DD / MM / YYYY"
-      />
+      <View style={{ gap: 4 }}>
+        <Field
+          label="Date of birth"
+          value={birth.dob}
+          onChange={(x) => setBirth({ ...birth, dob: x })}
+          placeholder="DD / MM / YYYY or YYYY-MM-DD"
+        />
+        <Text style={s.helper}>
+          Sets the baseline positions of the Sun, Moon, and planets for that day.
+        </Text>
+      </View>
 
       {/* Modern Time of Birth with Hour, Minute, and AM/PM Toggle */}
       <View style={{ gap: 8 }}>
@@ -239,12 +353,12 @@ export function BirthDetailsScreen({
           </View>
         </View>
         <Text style={s.helper}>
-          Not sure? Skip it. Your sign will still be accurate, but the ascendant
-          and house details need an exact time.
+          Determines the Lagna, house placements, Moon Nakshatra, and divisional
+          charts (Navamsa). The Lagna shifts roughly every 2 hours.
         </Text>
       </View>
 
-      {/* Place of Birth with sleek inline quick suggestions (No screen-expanding cards) */}
+      {/* Place of Birth with sleek inline quick suggestions */}
       <View style={{ gap: 8 }}>
         <Field
           label="Place of birth"
@@ -254,7 +368,7 @@ export function BirthDetailsScreen({
             setPlacesError("");
             setBirth({ ...birth, place: x });
           }}
-          placeholder="Enter city, town, or complete address"
+          placeholder="City / Town, State, and Country"
         />
 
         {/* Compact Quick Suggestion Pills (max 3) */}
@@ -303,10 +417,15 @@ export function BirthDetailsScreen({
         {!!placesError && !selectedPlace && (
           <Text style={s.helper}>{placesError}</Text>
         )}
+        <Text style={s.helper}>
+          Determines the exact local horizon and historical timezone offset at
+          birth. Enter your actual birthplace, not where you live today.
+        </Text>
       </View>
 
       <Text style={s.helper}>
-        Astronomical coordinates calculated via Swiss Ephemeris & Open-Meteo.
+        Decimal coordinates & historical timezone offset are resolved
+        automatically. Calculated with Lahiri (Chitrapaksha) Ayanamsa standard.
       </Text>
 
       {/* Primary Action Button */}

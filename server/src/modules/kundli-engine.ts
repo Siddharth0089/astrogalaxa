@@ -48,5 +48,5 @@ export function computeKundli(userId: string, birth: Birth, now = new Date()) {
   const planets=calculated.map(p=>{const index=Math.floor(p.longitude/30), star=nakshatra(p.longitude);return {id:p.id,sign:rashis[index].name,degree:p.longitude%30,house:ascIndex===null?null:((index-ascIndex+12)%12)+1,nakshatra:star.name,pada:star.pada,retrograde:p.retrograde};});
   const moon=calculated[1];
   const birthHash=createHash("sha256").update(JSON.stringify({dob:date.toISOString(),time:birth.time??null,lat:birth.lat,lng:birth.lng,timezone:birth.timezone})).digest("hex");
-  return {userId,birthHash,engineVersion:ENGINE_VERSION,accuracy:birth.time?"full":"approximate",ascendant:ascIndex===null?null:{sign:rashis[ascIndex].name,degree:ascLongitude!%30},planets,moonSign:rashis[Math.floor(moon.longitude/30)].name,nakshatra:nakshatra(moon.longitude),dasha:calculateDasha(moon.longitude,utc.toJSDate(),now,!birth.time),computedAt:now};
+  return {userId,birthHash,engineVersion:ENGINE_VERSION,ayanamsa:"lahiri",accuracy:birth.time?"full":"approximate",ascendant:ascIndex===null?null:{sign:rashis[ascIndex].name,degree:ascLongitude!%30},planets,moonSign:rashis[Math.floor(moon.longitude/30)].name,nakshatra:nakshatra(moon.longitude),dasha:calculateDasha(moon.longitude,utc.toJSDate(),now,!birth.time),computedAt:now};
 }

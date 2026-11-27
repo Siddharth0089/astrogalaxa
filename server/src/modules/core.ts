@@ -67,6 +67,8 @@ usersRouter.get(
       id: u.id,
       email: u.email,
       name: u.name,
+      gender: u.gender ?? null,
+      language: u.language || u.prefs?.language || "English",
       onboardingComplete: u.onboardingComplete,
       birth: u.birth,
       nameSign: u.nameSign,
@@ -81,9 +83,12 @@ usersRouter.patch(
     const body = z
       .object({
         name: z.string().trim().min(1).max(100).optional(),
+        gender: z.enum(["male", "female", "other"]).optional(),
+        language: z.enum(["English", "Hindi", "Hinglish"]).optional(),
         birth: birthSchema.optional(),
         prefs: z
           .object({
+            language: z.string().optional(),
             dailyHoroscope: z.boolean().optional(),
             astrologerOnline: z.boolean().optional(),
             chat: z.boolean().optional(),
@@ -107,6 +112,13 @@ usersRouter.patch(
       u.name = body.name;
       u.nameSign = nameSign(body.name);
     }
+    if (body.gender) {
+      u.gender = body.gender;
+    }
+    if (body.language) {
+      u.language = body.language;
+      u.set("prefs.language", body.language);
+    }
     if (body.birth) {
       u.birth = body.birth as any;
       u.nameSign = nameSign(u.name || "");
@@ -121,6 +133,8 @@ usersRouter.patch(
       id: u.id,
       email: u.email,
       name: u.name,
+      gender: u.gender ?? null,
+      language: u.language || u.prefs?.language || "English",
       onboardingComplete: u.onboardingComplete,
       birth: u.birth,
       nameSign: u.nameSign,
@@ -461,6 +475,8 @@ chatRouter.get(
 
 function buildVedicPrompt(u: any, kundli: any) {
   const userName = u?.name?.trim() || "Seeker";
+  const genderStr = u?.gender ? u.gender.charAt(0).toUpperCase() + u.gender.slice(1) : "Not specified";
+  const preferredLang = u?.language || u?.prefs?.language || "English";
   const planetsSummary = kundli?.planets?.length
     ? kundli.planets.map((p: any) => `${p.id} in ${p.sign}${p.house ? ` (House ${p.house})` : ""}`).join(", ")
     : "Not calculated yet";
@@ -471,11 +487,13 @@ function buildVedicPrompt(u: any, kundli: any) {
 
   const birthDateStr = u?.birth?.dob ? new Date(u.birth.dob).toISOString().split("T")[0] : "Unknown";
 
-  return `You are Astro Galexa AI, a wise, compassionate, and deeply knowledgeable Vedic astrologer.
+  return `You are Astro Galaxa AI, a wise, compassionate, and deeply knowledgeable Vedic astrologer.
 You are in a direct one-on-one consultation with the user.
 
 USER PROFILE & ASTROLOGICAL DATA:
 - Full Name: ${userName}
+- Gender: ${genderStr}
+- Preferred Language: ${preferredLang}
 - Birth Date: ${birthDateStr}
 - Birth Time: ${u?.birth?.time || "Not provided"}
 - Birth Place: ${u?.birth?.placeName || "Not provided"}
@@ -487,11 +505,12 @@ USER PROFILE & ASTROLOGICAL DATA:
 - Planetary House Placements: ${planetsSummary}
 
 RESPONSE GUIDELINES:
-1. Always greet the user warmly by their name (${userName}).
-2. Directly answer their question using their authentic Vedic placements (mention their relevant house, planetary placement, Moon sign, or current running Dasha when answering).
-3. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
-4. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice.
-5. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
+1. Always greet the user warmly by their name (${userName}). Address and personalize interpretations respectfully suited for a ${genderStr} seeker.
+2. Language Instruction: Reply strictly in ${preferredLang} (if Hindi, use authentic Hindi in Devanagari script; if Hinglish, write in natural conversational Hinglish using Roman/Latin alphabet as widely spoken across India; if English, respond in fluent, compassionate English).
+3. Directly answer their question using their authentic Vedic placements (mention their relevant house, planetary placement, Moon sign, or current running Dasha when answering).
+4. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
+5. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice.
+6. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
 }
 
 chatRouter.post(
