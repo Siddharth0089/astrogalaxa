@@ -97,7 +97,7 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
         overflow: "hidden",
       }}
     >
-      {/* Deep Space Background with subtle midnight nebula gradient */}
+      {/* Deep Space Background with luminous central galactic core */}
       <Svg
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
@@ -105,14 +105,23 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
         height="100%"
       >
         <Defs>
-          <RadialGradient id="deepNebula" cx="50%" cy="35%" r="70%">
-            <Stop offset="0" stopColor="#1E1B4B" stopOpacity=".22" />
-            <Stop offset="0.6" stopColor="#0B0F19" stopOpacity=".12" />
-            <Stop offset="1" stopColor="#000000" stopOpacity="0" />
+          {/* Central Galactic Core Glow - softer, lighter cosmic center */}
+          <RadialGradient id="galacticCore" cx="50%" cy="45%" r="60%">
+            <Stop offset="0%" stopColor="#3730A3" stopOpacity="0.45" />
+            <Stop offset="25%" stopColor="#1E1B4B" stopOpacity="0.32" />
+            <Stop offset="60%" stopColor="#0B0F19" stopOpacity="0.16" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          </RadialGradient>
+          {/* Secondary celestial starlight haze in the center */}
+          <RadialGradient id="starlightHaze" cx="50%" cy="42%" r="35%">
+            <Stop offset="0%" stopColor="#4F46E5" stopOpacity="0.22" />
+            <Stop offset="60%" stopColor="#1E1B4B" stopOpacity="0.08" />
+            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <Rect width="100%" height="100%" fill="#000000" />
-        <Rect width="100%" height="100%" fill="url(#deepNebula)" />
+        <Rect width="100%" height="100%" fill="url(#galacticCore)" />
+        <Rect width="100%" height="100%" fill="url(#starlightHaze)" />
       </Svg>
 
       {/* Twinkling Galaxy Stars Layer */}
