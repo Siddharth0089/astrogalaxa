@@ -71,6 +71,7 @@ export function BirthDetailsScreen({
   const [hour, setHour] = useState(parsedTime.h);
   const [minute, setMinute] = useState(parsedTime.m);
   const [period, setPeriod] = useState<"AM" | "PM">(parsedTime.p);
+  const [focusedInput, setFocusedInput] = useState<"hour" | "minute" | null>(null);
 
   const updateTime = (newH: string, newM: string, newP: "AM" | "PM") => {
     if (newH.trim() && newM.trim()) {
@@ -219,24 +220,27 @@ export function BirthDetailsScreen({
       {/* Modern Time of Birth with Hour, Minute, and AM/PM Toggle */}
       <View style={{ gap: 8 }}>
         <Text style={s.label}>Time of birth (optional)</Text>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          {/* Hour & Minute Container */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* Dedicated Hour Box */}
           <View
             style={{
               flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: C.glass,
-              borderWidth: 1,
-              borderColor: C.border,
-              borderRadius: 14,
+              minWidth: 0,
               height: 52,
-              paddingHorizontal: 12,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: focusedInput === "hour" ? C.gold : C.border,
+              backgroundColor: C.glass,
+              overflow: "hidden",
+              justifyContent: "center",
+              alignItems: "center",
             }}
           >
             <TextInput
               accessibilityLabel="Birth hour"
               value={hour}
+              onFocus={() => setFocusedInput("hour")}
+              onBlur={() => setFocusedInput(null)}
               onChangeText={(val) => {
                 const clean = val.replace(/\D/g, "").slice(0, 2);
                 if (clean === "" || (Number(clean) >= 0 && Number(clean) <= 12)) {
@@ -249,26 +253,50 @@ export function BirthDetailsScreen({
               keyboardType="number-pad"
               maxLength={2}
               style={{
-                flex: 1,
+                width: "100%",
+                height: "100%",
                 color: C.text,
                 fontSize: 16,
                 textAlign: "center",
                 fontWeight: "600",
+                paddingHorizontal: 0,
+                ...({ outlineStyle: "none" } as object),
               }}
             />
-            <Text
-              style={{
-                color: C.muted,
-                fontSize: 18,
-                fontWeight: "700",
-                paddingHorizontal: 4,
-              }}
-            >
-              :
-            </Text>
+          </View>
+
+          {/* Colon Separator */}
+          <Text
+            style={{
+              color: C.muted,
+              fontSize: 20,
+              fontWeight: "700",
+              paddingHorizontal: 2,
+            }}
+          >
+            :
+          </Text>
+
+          {/* Dedicated Minute Box */}
+          <View
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 52,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: focusedInput === "minute" ? C.gold : C.border,
+              backgroundColor: C.glass,
+              overflow: "hidden",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
             <TextInput
               accessibilityLabel="Birth minute"
               value={minute}
+              onFocus={() => setFocusedInput("minute")}
+              onBlur={() => setFocusedInput(null)}
               onChangeText={(val) => {
                 const clean = val.replace(/\D/g, "").slice(0, 2);
                 if (clean === "" || (Number(clean) >= 0 && Number(clean) <= 59)) {
@@ -281,11 +309,14 @@ export function BirthDetailsScreen({
               keyboardType="number-pad"
               maxLength={2}
               style={{
-                flex: 1,
+                width: "100%",
+                height: "100%",
                 color: C.text,
                 fontSize: 16,
                 textAlign: "center",
                 fontWeight: "600",
+                paddingHorizontal: 0,
+                ...({ outlineStyle: "none" } as object),
               }}
             />
           </View>
