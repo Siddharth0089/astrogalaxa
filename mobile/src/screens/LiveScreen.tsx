@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   BackHandler,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -196,7 +197,11 @@ export function LiveScreen({
   // Active Live Consultation View
   if (threadId && activeExpert) {
     return (
-      <View style={[s.chatPage, { paddingBottom: 92 }]}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={[s.chatPage, { paddingBottom: 14 }]}>
         <View style={s.header}>
           <Pressable
             accessibilityRole="button"
@@ -342,12 +347,13 @@ export function LiveScreen({
             <Text style={{ color: C.onGold, fontWeight: "800" }}>↑</Text>
           </Pressable>
         </View>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={[s.page, { paddingBottom: 104 }]}>
+    <ScrollView contentContainerStyle={[s.page, { paddingBottom: 28 }]}>
       <View style={s.header}>
         <Pressable
           accessibilityRole="button"

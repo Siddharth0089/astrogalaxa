@@ -230,16 +230,19 @@ export default function App() {
   }, [screen, token, horoscopeRetry]);
 
   useEffect(() => {
-    if (screen !== "kundli" || !token) return;
+    const needsKundli = screen === "kundli" || (screen === "chat" && !kundli);
+    if (!needsKundli || !token) return;
     let active = true;
-    setKundliLoading(true);
-    setKundliError("");
+    if (screen === "kundli") {
+      setKundliLoading(true);
+      setKundliError("");
+    }
     request("/kundli", undefined, token)
       .then((data: KundliData) => {
         if (active) setKundli(data);
       })
       .catch((error: unknown) => {
-        if (active) {
+        if (active && screen === "kundli") {
           setKundli(null);
           setKundliError(
             error instanceof Error
@@ -249,12 +252,12 @@ export default function App() {
         }
       })
       .finally(() => {
-        if (active) setKundliLoading(false);
+        if (active && screen === "kundli") setKundliLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [screen, token, kundliRetry]);
+  }, [screen, token, kundli, kundliRetry]);
 
   useEffect(() => {
     if (screen !== "birth" || selectedPlace || birth.place.trim().length < 2) {
@@ -661,7 +664,17 @@ export default function App() {
       />
     );
   else if (screen === "chat")
-    body = <ChatScreen onNavigate={go} name={name} language={language} />;
+    body = (
+      <ChatScreen
+        onNavigate={go}
+        name={name}
+        language={language}
+        kundli={kundli}
+        nameSign={nameSign}
+        sunSign={sunSign}
+        authenticated={Boolean(token)}
+      />
+    );
   else if (screen === "live")
     body = <LiveScreen authenticated={Boolean(token)} language={language} onNavigate={go} />;
   else if (screen === "tarot")
@@ -789,7 +802,7 @@ export default function App() {
               </View>
             )}
             <View style={{ flex: 1 }}>{body}</View>
-            {(["home", "kundli", "chat", "live", "tarot", "profile"] as Screen[]).includes(
+            {(["home", "kundli", "tarot", "profile"] as Screen[]).includes(
               screen,
             ) && (
               <BottomNav

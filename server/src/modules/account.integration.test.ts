@@ -656,4 +656,78 @@ describe("astrologers and unavailable AI", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("auto-computes Kundli on AI chat and grounds prompt & fallback in user placements", async () => {
+    const chatUser = await models.User.create({
+      email: "aichat@example.test",
+      name: "Kavya",
+      language: "English",
+      nameSign: { name: "Gemini", vedicName: "Mithun", element: "Air", ruler: "Mercury" },
+      sunSign: "Leo",
+      birth: {
+        dob: new Date("1997-08-14T00:00:00.000Z"),
+        time: "09:30",
+        placeName: "Jaipur, India",
+        lat: 26.9124,
+        lng: 75.7873,
+        timezone: "Asia/Kolkata",
+      },
+    });
+    const session = await models.Session.create({
+      userId: chatUser._id,
+      refreshTokenHash: "ai-chat-session",
+      expiresAt: new Date(Date.now() + 60000),
+    });
+    const token = jwt.sign(
+      { sub: chatUser._id.toString(), sid: session._id.toString() },
+      secret,
+    );
+
+    expect(await models.Kundli.findOne({ userId: chatUser._id })).toBeNull();
+
+    vi.stubEnv("GROQ_API_KEY", "test-groq-key-value");
+    const originalFetch = globalThis.fetch;
+    let capturedBody = "";
+    globalThis.fetch = vi.fn().mockImplementation(async (_url, init) => {
+      capturedBody = String((init as RequestInit | undefined)?.body || "");
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "Chart-grounded reply for Kavya." } }],
+        }),
+      } as unknown as Response;
+    });
+
+    try {
+      const okRes = await request(app)
+        .post("/chat/ai")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "How does my career look this year?" });
+      expect(okRes.status).toBe(200);
+      expect(okRes.body.data.text).toBe("Chart-grounded reply for Kavya.");
+
+      // Verify Kundli was computed automatically and injected into system prompt
+      const computed = await models.Kundli.findOne({ userId: chatUser._id }).lean();
+      expect(computed?.moonSign).toBeTruthy();
+      expect(capturedBody).toContain(computed?.ascendant?.sign || "");
+      expect(capturedBody).toContain(computed?.moonSign || "");
+      expect(capturedBody).toContain("Life Area Houses:");
+
+      // Verify chart-grounded fallback if upstream LLM fails temporarily
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("timeout"));
+      const fallbackRes = await request(app)
+        .post("/chat/ai")
+        .set("Authorization", `Bearer ${token}`)
+        .send({
+          text: "What about my career in my 10th house?",
+          threadId: okRes.body.data.threadId,
+        });
+      expect(fallbackRes.status).toBe(200);
+      expect(fallbackRes.body.data.text).toContain("Kavya");
+      expect(fallbackRes.body.data.text).toContain("natal Kundli");
+    } finally {
+      globalThis.fetch = originalFetch;
+      vi.stubEnv("GROQ_API_KEY", "");
+    }
+  });
 });

@@ -1068,10 +1068,114 @@ chatRouter.get(
   }),
 );
 
+function buildHouseHighlights(planets: any[] | undefined): string {
+  if (!Array.isArray(planets) || planets.length === 0) return "Houses pending birth time";
+  const byHouse = new Map<number, string[]>();
+  for (const p of planets) {
+    if (typeof p?.house === "number") {
+      const list = byHouse.get(p.house) ?? [];
+      list.push(`${p.id} in ${p.sign}${p.dignity && p.dignity !== "Neutral" ? ` (${p.dignity})` : ""}`);
+      byHouse.set(p.house, list);
+    }
+  }
+  const domains: [string, number[]][] = [
+    ["Self/Health (H1/H6)", [1, 6]],
+    ["Wealth/Gains (H2/H11)", [2, 11]],
+    ["Love/Marriage (H5/H7)", [5, 7]],
+    ["Career/Fortune (H10/H9)", [10, 9]],
+  ];
+  return domains
+    .map(([label, houses]) => {
+      const items = houses.flatMap((h) => (byHouse.get(h) ?? []).map((x) => `H${h}: ${x}`));
+      return `${label}: ${items.length ? items.join(", ") : "Empty (governed by sign lord)"}`;
+    })
+    .join(" | ");
+}
+
+async function ensureUserKundli(userId: string, u: any) {
+  let kundli = await Kundli.findOne({ userId }).lean();
+  if (!kundli && u?.birth?.dob) {
+    try {
+      kundli = await Kundli.findOneAndUpdate(
+        { userId },
+        computeKundli(userId, u.birth),
+        { upsert: true, new: true },
+      ).lean();
+    } catch {
+      // Proceed cleanly if birth coordinates are incomplete
+    }
+  }
+  return kundli;
+}
+
+function buildChartGroundedFallback(
+  question: string,
+  u: any,
+  kundli: any,
+  recentTarot?: any,
+): string {
+  const userName = u?.name?.trim() || "Seeker";
+  const lang = u?.language || u?.prefs?.language || "English";
+  const q = question.toLowerCase();
+  const asc = kundli?.ascendant?.sign || u?.nameSign?.name || "your rising sign";
+  const moon = kundli?.moonSign || u?.sunSign || "your natal moon";
+  const star = kundli?.nakshatra?.name || "your birth star";
+  const dasha = kundli?.dasha?.current?.planet
+    ? `${kundli.dasha.current.planet}${kundli.dasha.current.subperiod ? ` / ${kundli.dasha.current.subperiod.planet}` : ""}`
+    : "balanced planetary cycle";
+  const transits = kundli?.moonSign ? computeTransits(kundli.moonSign) : null;
+  const sadeSati = transits?.sadeSati?.status || "Normal transit";
+
+  const isCareer = /career|job|work|business|promotion|study|exam|interview/.test(q);
+  const isLove = /love|marriage|shaadi|wife|husband|partner|relationship|crush/.test(q);
+  const isMoney = /money|wealth|finance|income|salary|invest|debt/.test(q);
+  const isHealth = /health|stress|peace|sleep|anxiety|body|energy/.test(q);
+  const isTarot = /tarot|card|spread/.test(q) && recentTarot?.cards?.length;
+
+  const targetHouses = isCareer ? [10, 9] : isLove ? [7, 5] : isMoney ? [2, 11] : isHealth ? [1, 6] : [1, 10];
+  const relevantPlanets = Array.isArray(kundli?.planets)
+    ? kundli.planets
+        .filter((p: any) => targetHouses.includes(p.house))
+        .map((p: any) => `${p.id} (House ${p.house}, ${p.sign})`)
+    : [];
+
+  if (lang === "Hindi") {
+    const focusNote = relevantPlanets.length
+      ? `आपके प्रश्न से जुड़े भावों में ${relevantPlanets.join(", ")} स्थित हैं।`
+      : `आपकी लग्न राशि ${asc} और चन्द्र राशि ${moon} (${star} नक्षत्र) संतुलन दर्शाती है।`;
+    const tarotPart = isTarot
+      ? ` हालिया टैरो रीडिंग (${recentTarot.cards.map((c: any) => c.name).join(", ")}) भी धैर्य और स्पष्ट निर्णय का संकेत देती है।`
+      : "";
+    return `नमस्ते ${userName}, आपकी कुंडली के अनुसार वर्तमान समय ${dasha} दशा और ${sadeSati} गोचर स्थिति में चल रहा है। ${focusNote}${tarotPart} व्यावहारिक सलाह: सुबह शांत ध्यान करें, जल्दबाजी से बचें और अपने मुख्य लक्ष्य पर निरंतर कार्य करें।`;
+  }
+
+  if (lang === "Hinglish") {
+    const focusNote = relevantPlanets.length
+      ? `Aapke sawaal se jude houses mein ${relevantPlanets.join(", ")} placed hain.`
+      : `Aapka ${asc} Lagna aur ${moon} Moon (${star} Nakshatra) steady focus dikhata hai.`;
+    const tarotPart = isTarot
+      ? ` Aapke recent Tarot draw (${recentTarot.cards.map((c: any) => c.name).join(", ")}) ka bhi clear sanket hai ki patience aur clarity rakhein.`
+      : "";
+    return `Namaste ${userName}, aapki Kundli ke hisab se abhi ${dasha} Dasha chal rahi hai aur Saturn Sade Sati status "${sadeSati}" hai. ${focusNote}${tarotPart} Best remedy: daily morning grounding aur clear planning ke saath steady steps lein.`;
+  }
+
+  const focusNote = relevantPlanets.length
+    ? `Specifically for your question, your chart highlights ${relevantPlanets.join(", ")}.`
+    : `With ${asc} Ascendant and ${moon} Moon (${star} Nakshatra), steady alignment favors thoughtful action.`;
+  const tarotPart = isTarot
+    ? ` Your recent Tarot spread (${recentTarot.cards.map((c: any) => c.name).join(", ")}) also reinforces patience and clear intention.`
+    : "";
+  return `Hello ${userName}, based on your natal Kundli, you are currently navigating the ${dasha} planetary period with transit status "${sadeSati}". ${focusNote}${tarotPart} Practical guidance: maintain mindful daily focus, avoid rushed decisions, and build steady momentum.`;
+}
+
 function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
   const userName = u?.name?.trim() || "Seeker";
   const genderStr = u?.gender ? u.gender.charAt(0).toUpperCase() + u.gender.slice(1) : "Not specified";
   const preferredLang = u?.language || u?.prefs?.language || "English";
+  const nameSignInfo = u?.nameSign as { name?: string; vedicName?: string; element?: string; ruler?: string } | undefined;
+  const nameSignStr = nameSignInfo?.name
+    ? `${nameSignInfo.name} (${nameSignInfo.vedicName || ""}) · Element: ${nameSignInfo.element || "—"}, Ruler: ${nameSignInfo.ruler || "—"}`
+    : "Not set";
   const planetsSummary = kundli?.planets?.length
     ? kundli.planets
         .map(
@@ -1082,7 +1186,7 @@ function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
     : "Not calculated yet";
 
   const yogasSummary = kundli?.yogas?.length
-    ? kundli.yogas.map((y: any) => y.name).join(", ")
+    ? kundli.yogas.map((y: any) => `${y.name}${y.effect ? ` (${y.effect})` : ""}`).join(", ")
     : "Standard planetary combination";
 
   const liveTransits = kundli?.moonSign ? computeTransits(kundli.moonSign) : null;
@@ -1091,7 +1195,7 @@ function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
     : "Unavailable";
 
   const dashaSummary = kundli?.dasha?.current
-    ? `${kundli.dasha.current.planet} Mahadasha${kundli.dasha.current.subperiod ? ` with ${kundli.dasha.current.subperiod.planet} Antardasha` : ""}`
+    ? `${kundli.dasha.current.planet} Mahadasha${kundli.dasha.current.subperiod ? ` with ${kundli.dasha.current.subperiod.planet} Antardasha${kundli.dasha.current.subperiod.end ? ` (until ${new Date(kundli.dasha.current.subperiod.end).toISOString().split("T")[0]})` : ""}` : ""}`
     : "General lifecycle period";
 
   const birthDateStr = u?.birth?.dob ? new Date(u.birth.dob).toISOString().split("T")[0] : "Unknown";
@@ -1114,6 +1218,7 @@ USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 - Full Name: ${userName}
 - Gender: ${genderStr}
 - Preferred Language: ${preferredLang}
+- Name Rashi (Name Sign): ${nameSignStr}
 - Birth Date: ${birthDateStr}
 - Birth Time: ${u?.birth?.time || "Not provided"}
 - Birth Place: ${u?.birth?.placeName || "Not provided"}
@@ -1121,7 +1226,9 @@ USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 - Moon Sign (Chandra Rashi): ${kundli?.moonSign || "Unknown"}
 - Sun Sign (Surya Rashi): ${u?.sunSign || "Unknown"}
 - Nakshatra: ${kundli?.nakshatra?.name || "Unknown"}${kundli?.nakshatra?.pada ? ` (Pada ${kundli.nakshatra.pada})` : ""}
-- Navamsa (D9) Ascendant: ${kundli?.d9?.ascendant?.sign || "Unknown"}
+- Navamsa (D9) Ascendant: ${kundli?.d9?.ascendant?.sign || "Unknown"} | Dasamsa (D10) Ascendant: ${kundli?.d10?.ascendant?.sign || "Unknown"}
+- Manglik Status: ${kundli?.avakhada?.manglik || "Unknown"}
+- Life Area Houses: ${buildHouseHighlights(kundli?.planets)}
 - Active Yogas: ${yogasSummary}
 - Active Planetary Period (Dasha): ${dashaSummary}
 - Planetary Placements & Dignities: ${planetsSummary}
@@ -1131,11 +1238,108 @@ USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 STRICT PANDIT GUIDELINES:
 1. Always greet the user warmly by their name (${userName}) using ONLY the requested language (${preferredLang}). Address interpretations respectfully for a ${genderStr} seeker.
 ${languageRule}
-3. Do NOT guess or hallucinate any planetary positions: strictly reference the authentic calculated placements and active planetary period provided in the data above.
-4. Directly answer their question using their authentic placements (mention relevant house, planetary placement, Moon sign, or active planetary period when answering). If relevant or asked, weave their recent tarot draw into the guidance.
-5. If their birth time is approximate or unknown, provide general Moon-sign/Nakshatra guidance while noting that exact house details depend on birth time.
-6. Keep the tone compassionate, uplifting, practical, and grounded. Never give fatalistic predictions or medical/legal advice. Include gentle reminders that astrology provides reflection, not absolute fate.
-7. Offer practical spiritual and behavioral remedies (e.g. mindfulness, clarity, focus, positive habits) suited to their current planetary period.`;
+3. Do NOT guess or hallucinate any planetary positions: strictly reference the authentic calculated placements, house placements, and active planetary period provided in the data above.
+4. Directly and specifically answer the user's exact question first, citing 2–3 relevant placements (house planets, Ascendant, Moon sign, Dasha, or transit/Tarot) rather than giving a generic horoscope.
+5. If their birth time is approximate or unknown, provide Moon-sign/Nakshatra guidance while noting that exact Lagna house divisions depend on birth time.
+6. Keep the tone compassionate, uplifting, structured, practical, and grounded. Never give fatalistic predictions or medical/legal advice.
+7. End with 1–2 practical spiritual or behavioral remedies suited to their current planetary period.`;
+}
+
+async function generateVedicAiReply({
+  sysPrompt,
+  history,
+  question,
+  u,
+  kundli,
+  recentTarot,
+  logger,
+}: {
+  sysPrompt: string;
+  history: { role: "user" | "assistant"; content: string }[];
+  question: string;
+  u: any;
+  kundli: any;
+  recentTarot?: any;
+  logger?: { warn?: (obj: unknown, msg?: string) => void };
+}): Promise<string> {
+  const groqOrOpenAiKey =
+    env.GROQ_API_KEY ||
+    env.AI_API_KEY ||
+    process.env.GROQ_API_KEY?.trim() ||
+    process.env.AI_API_KEY?.trim();
+  const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY?.trim();
+
+  if (groqOrOpenAiKey) {
+    try {
+      const response = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${groqOrOpenAiKey}`,
+        },
+        body: JSON.stringify({
+          model: env.AI_MODEL,
+          messages: [
+            { role: "system", content: sysPrompt },
+            ...history,
+            { role: "user", content: question },
+          ],
+          temperature: 0.65,
+          max_tokens: 700,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) return content;
+      } else {
+        logger?.warn?.({ status: response.status }, "OpenAI/Groq AI request returned non-OK status");
+      }
+    } catch (err) {
+      logger?.warn?.(
+        { err: err instanceof Error ? err.message : "unknown" },
+        "OpenAI/Groq AI request failed",
+      );
+    }
+  }
+
+  if (geminiKey) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const contents = [
+        ...history.map((h) => ({
+          role: h.role === "user" ? "user" : "model",
+          parts: [{ text: h.content }],
+        })),
+        { role: "user", parts: [{ text: question }] },
+      ];
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: sysPrompt }] },
+          contents,
+          generationConfig: { temperature: 0.65, maxOutputTokens: 700 },
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (content) return content;
+      } else {
+        logger?.warn?.({ status: response.status }, "Gemini AI request returned non-OK status");
+      }
+    } catch (err) {
+      logger?.warn?.(
+        { err: err instanceof Error ? err.message : "unknown" },
+        "Gemini AI request failed",
+      );
+    }
+  }
+
+  return buildChartGroundedFallback(question, u, kundli, recentTarot);
 }
 
 chatRouter.post(
@@ -1148,9 +1352,13 @@ chatRouter.post(
       })
       .parse(req.body);
 
-    const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
-    const geminiKey = env.GEMINI_API_KEY;
-    const activeKey = groqOrOpenAiKey || geminiKey;
+    const activeKey =
+      env.GROQ_API_KEY ||
+      env.AI_API_KEY ||
+      env.GEMINI_API_KEY ||
+      process.env.GROQ_API_KEY?.trim() ||
+      process.env.AI_API_KEY?.trim() ||
+      process.env.GEMINI_API_KEY?.trim();
 
     if (!activeKey) {
       throw new AppError(
@@ -1172,7 +1380,6 @@ chatRouter.post(
       });
     }
 
-    // Fetch prior messages before saving current user message for context
     const priorMessages = await ChatMessage.find({ threadId: thread._id })
       .sort({ createdAt: -1 })
       .limit(8)
@@ -1180,70 +1387,27 @@ chatRouter.post(
 
     await ChatMessage.create({ threadId: thread._id, sender: "user", text });
 
-    const [u, kundli, recentTarot] = await Promise.all([
+    const [u, recentTarot] = await Promise.all([
       User.findById(req.userId).lean(),
-      Kundli.findOne({ userId: req.userId }).lean(),
       TarotReading.findOne({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
     ]);
+    const kundli = await ensureUserKundli(req.userId!, u);
 
     const sysPrompt = buildVedicPrompt(u, kundli, recentTarot);
-
-    // Build multi-turn conversational history in chronological order
     const history = priorMessages.reverse().map((m) => ({
       role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-      content: m.text,
+      content: m.text || "",
     }));
 
-    let aiText = "The celestial bodies invite patience and clarity today.";
-    try {
-      if (groqOrOpenAiKey) {
-        const response = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqOrOpenAiKey}`,
-          },
-          body: JSON.stringify({
-            model: env.AI_MODEL,
-            messages: [
-              { role: "system", content: sysPrompt },
-              ...history,
-              { role: "user", content: text },
-            ],
-            temperature: 0.7,
-            max_tokens: 600,
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          aiText = data.choices?.[0]?.message?.content || aiText;
-        }
-      } else if (geminiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-        const historyText = history.map((h) => `${h.role === "user" ? "User" : "Pandit"}: ${h.content}`).join("\n");
-        const promptWithHistory = `${sysPrompt}\n\nRecent Conversation:\n${historyText}\nUser: ${text}`;
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: promptWithHistory }],
-              },
-            ],
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || aiText;
-        }
-      }
-    } catch {
-      // Graceful fallback
-    }
+    const aiText = await generateVedicAiReply({
+      sysPrompt,
+      history,
+      question: text,
+      u,
+      kundli,
+      recentTarot,
+      logger: req.log,
+    });
 
     const aiMsg = await ChatMessage.create({
       threadId: thread._id,
@@ -1264,9 +1428,13 @@ chatRouter.post(
       })
       .parse(req.body);
 
-    const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
-    const geminiKey = env.GEMINI_API_KEY;
-    const activeKey = groqOrOpenAiKey || geminiKey;
+    const activeKey =
+      env.GROQ_API_KEY ||
+      env.AI_API_KEY ||
+      env.GEMINI_API_KEY ||
+      process.env.GROQ_API_KEY?.trim() ||
+      process.env.AI_API_KEY?.trim() ||
+      process.env.GEMINI_API_KEY?.trim();
 
     if (!activeKey) {
       throw new AppError(
@@ -1299,71 +1467,29 @@ chatRouter.post(
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
 
-    const [u, kundli, recentTarot] = await Promise.all([
+    const [u, recentTarot] = await Promise.all([
       User.findById(req.userId).lean(),
-      Kundli.findOne({ userId: req.userId }).lean(),
       TarotReading.findOne({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
     ]);
+    const kundli = await ensureUserKundli(req.userId!, u);
 
     const sysPrompt = buildVedicPrompt(u, kundli, recentTarot);
     const history = priorMessages.reverse().map((m) => ({
       role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
-      content: m.text,
+      content: m.text || "",
     }));
 
-    let fullText = "The celestial alignment suggests quiet contemplation.";
-    try {
-      if (groqOrOpenAiKey) {
-        const response = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${groqOrOpenAiKey}`,
-          },
-          body: JSON.stringify({
-            model: env.AI_MODEL,
-            messages: [
-              { role: "system", content: sysPrompt },
-              ...history,
-              { role: "user", content: text },
-            ],
-            temperature: 0.7,
-            max_tokens: 600,
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          fullText = data.choices?.[0]?.message?.content || fullText;
-          res.write(`data: ${JSON.stringify({ text: fullText, threadId: thread._id })}\n\n`);
-        }
-      } else if (geminiKey) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-        const historyText = history.map((h) => `${h.role === "user" ? "User" : "Pandit"}: ${h.content}`).join("\n");
-        const promptWithHistory = `${sysPrompt}\n\nRecent Conversation:\n${historyText}\nUser: ${text}`;
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: promptWithHistory }],
-              },
-            ],
-          }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || fullText;
-          res.write(`data: ${JSON.stringify({ text: fullText, threadId: thread._id })}\n\n`);
-        }
-      }
-    } catch {
-      res.write(`data: ${JSON.stringify({ text: fullText, threadId: thread._id })}\n\n`);
-    }
+    const fullText = await generateVedicAiReply({
+      sysPrompt,
+      history,
+      question: text,
+      u,
+      kundli,
+      recentTarot,
+      logger: req.log,
+    });
 
+    res.write(`data: ${JSON.stringify({ text: fullText, threadId: thread._id })}\n\n`);
     await ChatMessage.create({ threadId: thread._id, sender: "ai", text: fullText });
     res.write("data: [DONE]\n\n");
     res.end();
