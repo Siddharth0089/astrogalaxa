@@ -25,7 +25,7 @@ import {
   requireAuth,
 } from "../common/http.js";
 import { nameSign, sunSign } from "../common/signs.js";
-import { computeKundli } from "./kundli-engine.js";
+import { computeKundli, computeTransits, ENGINE_VERSION } from "./kundli-engine.js";
 import { localizeHoroscope, seedHoroscope } from "./horoscope-content.js";
 
 const validTimezone = (zone: string) => {
@@ -221,15 +221,25 @@ kundliRouter.get(
       timezone: birth.timezone,
     })).digest("hex");
 
-    if (existing && existing.birthHash === currentHash) {
-      return ok(res, existing);
+    if (
+      existing &&
+      existing.birthHash === currentHash &&
+      existing.engineVersion === ENGINE_VERSION &&
+      existing.avakhada &&
+      existing.d9
+    ) {
+      const plain = existing.toObject();
+      const transits = computeTransits(plain.moonSign || "Aries");
+      return ok(res, { ...plain, transits });
     }
     const k = await Kundli.findOneAndUpdate(
       { userId: u.id },
       computeKundli(u.id, birth),
       { upsert: true, new: true },
     );
-    ok(res, k);
+    const plain = k.toObject();
+    const transits = computeTransits(plain.moonSign || "Aries");
+    ok(res, { ...plain, transits });
   }),
 );
 kundliRouter.post(
@@ -247,7 +257,8 @@ kundliRouter.post(
       upsert: true,
       new: true,
     });
-    ok(res, k);
+    const transits = computeTransits(k.moonSign || "Aries");
+    ok(res, { ...k, transits });
   }),
 );
 export const publicRouter = Router();
@@ -558,8 +569,22 @@ function buildVedicPrompt(u: any, kundli: any, recentTarot?: any) {
   const genderStr = u?.gender ? u.gender.charAt(0).toUpperCase() + u.gender.slice(1) : "Not specified";
   const preferredLang = u?.language || u?.prefs?.language || "English";
   const planetsSummary = kundli?.planets?.length
-    ? kundli.planets.map((p: any) => `${p.id} in ${p.sign}${p.house ? ` (House ${p.house})` : ""}`).join(", ")
+    ? kundli.planets
+        .map(
+          (p: any) =>
+            `${p.id} in ${p.sign}${p.house ? ` (House ${p.house})` : ""}${p.dignity && p.dignity !== "Neutral" ? ` [${p.dignity}]` : ""}${p.retrograde ? " [Retrograde]" : ""}${p.vargottama ? " [Vargottama]" : ""}`,
+        )
+        .join(", ")
     : "Not calculated yet";
+
+  const yogasSummary = kundli?.yogas?.length
+    ? kundli.yogas.map((y: any) => y.name).join(", ")
+    : "Standard planetary combination";
+
+  const liveTransits = kundli?.moonSign ? computeTransits(kundli.moonSign) : null;
+  const transitSummary = liveTransits
+    ? `Saturn Sade Sati: ${liveTransits.sadeSati.status}. Current Transits from Moon: ${liveTransits.planets.map((p: any) => `${p.id} in ${p.sign} (H${p.houseFromMoon})`).join(", ")}.`
+    : "Unavailable";
 
   const dashaSummary = kundli?.dasha?.current
     ? `${kundli.dasha.current.planet} Mahadasha${kundli.dasha.current.subperiod ? ` with ${kundli.dasha.current.subperiod.planet} Antardasha` : ""}`
@@ -591,9 +616,12 @@ USER PROFILE & AUTHENTIC ASTROLOGICAL DATA:
 - Ascendant (Lagna): ${kundli?.ascendant?.sign || "Unknown"}
 - Moon Sign (Chandra Rashi): ${kundli?.moonSign || "Unknown"}
 - Sun Sign (Surya Rashi): ${u?.sunSign || "Unknown"}
-- Nakshatra: ${kundli?.nakshatra?.name || "Unknown"}
+- Nakshatra: ${kundli?.nakshatra?.name || "Unknown"}${kundli?.nakshatra?.pada ? ` (Pada ${kundli.nakshatra.pada})` : ""}
+- Navamsa (D9) Ascendant: ${kundli?.d9?.ascendant?.sign || "Unknown"}
+- Active Yogas: ${yogasSummary}
 - Active Planetary Period (Dasha): ${dashaSummary}
-- Planetary House Placements: ${planetsSummary}
+- Planetary Placements & Dignities: ${planetsSummary}
+- Live Transits (Gochar): ${transitSummary}
 - Recent Tarot Draw Context: ${tarotContext}
 
 STRICT PANDIT GUIDELINES:

@@ -82,6 +82,13 @@ export type Planet = {
   nakshatra?: string;
   pada?: number;
   retrograde?: boolean;
+  dignity?: "Exalted" | "Debilitated" | "Own Sign" | "Neutral";
+  combust?: boolean;
+  vargottama?: boolean;
+  d9Sign?: string;
+  d9House?: number | null;
+  d10Sign?: string;
+  d10House?: number | null;
 };
 
 export type TarotReading = {
@@ -121,8 +128,39 @@ export type KundliData = {
   ayanamsa?: string;
   ascendant: { sign: string; degree?: number } | null;
   moonSign: string;
-  nakshatra: { name: string; index?: number; pada?: number };
+  nakshatra: { name: string; index?: number; pada?: number; lord?: string };
   planets: Planet[];
+  avakhada?: {
+    varna: string;
+    vashya: string;
+    tatva: string;
+    rashiSwami: string;
+    nakshatraLord: string;
+    nadi: string;
+    gana: string;
+    yoni: string;
+    payaa: string;
+  };
+  yogas?: { name: string; description: string }[];
+  d9?: {
+    ascendant: { sign: string } | null;
+    planets: { id: string; sign: string; house: number | null; retrograde?: boolean }[];
+  };
+  d10?: {
+    ascendant: { sign: string } | null;
+    planets: { id: string; sign: string; house: number | null; retrograde?: boolean }[];
+  };
+  transits?: {
+    computedAt: string;
+    sadeSati: { status: string; active: boolean; summary: string };
+    planets: {
+      id: string;
+      sign: string;
+      degree: number;
+      houseFromMoon: number;
+      retrograde: boolean;
+    }[];
+  };
   dasha: {
     approximate: boolean;
     current: {

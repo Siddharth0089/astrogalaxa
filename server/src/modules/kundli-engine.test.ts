@@ -39,4 +39,27 @@ describe("sidereal calculation", () => {
     expect(()=>computeKundli("x",{...location,dob:new Date("2024-03-10T00:00:00Z"),time:"02:30"})).toThrow();
     expect(()=>computeKundli("x",{...location,dob:new Date("2024-11-03T00:00:00Z"),time:"01:30"})).toThrow();
   });
+  it("computes D9 Navamsa, D10 Dasamsa, Avakhada attributes, yogas, and live transits", async () => {
+    const { computeKundli, computeTransits } = await import("./kundli-engine.js");
+    const result = computeKundli(
+      "test",
+      { dob: new Date("1998-08-20T00:00:00Z"), time: "06:40", lat: 28.61, lng: 77.21, timezone: "Asia/Kolkata" },
+      new Date("2026-01-01T00:00:00Z"),
+    );
+    expect(result.ayanamsa).toBe("lahiri");
+    expect(result.d9?.planets).toHaveLength(9);
+    expect(result.d10?.planets).toHaveLength(9);
+    expect(result.d9?.ascendant?.sign).toBeTruthy();
+    expect(result.d10?.ascendant?.sign).toBeTruthy();
+    expect(result.avakhada?.varna).toBeTruthy();
+    expect(result.avakhada?.nadi).toBeTruthy();
+    expect(result.avakhada?.gana).toBeTruthy();
+    expect(result.avakhada?.yoni).toBeTruthy();
+    expect(result.planets[0].dignity).toBe("Own Sign"); // Sun in Leo
+    expect(Array.isArray(result.yogas)).toBe(true);
+
+    const transits = computeTransits("Cancer", new Date("2026-01-01T00:00:00Z"));
+    expect(transits.planets.length).toBeGreaterThanOrEqual(6);
+    expect(transits.sadeSati.status).toBeTruthy();
+  });
 });
