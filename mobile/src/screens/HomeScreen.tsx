@@ -5,6 +5,7 @@ import { ZodiacBadge, ZodiacIcon } from "../components/ZodiacBadge";
 import { Horoscope, Language, NameSign, PanchangData, Screen } from "../types";
 import { apiRequest } from "../../session";
 import { C, disclaimer } from "../theme/colors";
+import { PANCHANG_GUIDE } from "../theme/astroGuide";
 import { formatTitleCase, getCopy } from "../theme/i18n";
 import { s } from "../theme/styles";
 
@@ -32,6 +33,7 @@ export function HomeScreen({
   onNavigate: (s: Screen) => void;
 }) {
   const [panchang, setPanchang] = useState<PanchangData | null>(null);
+  const [showPanchangGuide, setShowPanchangGuide] = useState(false);
   const t = getCopy(language);
   const displayName = formatTitleCase(name);
   const initial = (displayName || "U").charAt(0).toUpperCase();
@@ -408,10 +410,65 @@ export function HomeScreen({
             >
               ✦ Today&apos;s Vedic Panchang
             </Text>
-            <Text style={{ color: C.secondary, fontSize: 11 }}>
-              {panchang.vara}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Text style={{ color: C.secondary, fontSize: 11 }}>
+                {panchang.vara}
+              </Text>
+              <Pressable
+                onPress={() => setShowPanchangGuide(!showPanchangGuide)}
+                style={{
+                  backgroundColor: showPanchangGuide
+                    ? "rgba(243, 197, 86, 0.2)"
+                    : "rgba(255, 255, 255, 0.06)",
+                  borderWidth: 1,
+                  borderColor: showPanchangGuide
+                    ? C.gold
+                    : "rgba(255, 255, 255, 0.14)",
+                  borderRadius: 8,
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                }}
+              >
+                <Text
+                  style={{
+                    color: showPanchangGuide ? C.gold : C.text,
+                    fontSize: 10.5,
+                    fontWeight: "600",
+                  }}
+                >
+                  {showPanchangGuide ? "Close" : "? Guide"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
+
+          {showPanchangGuide && (
+            <View
+              style={{
+                backgroundColor: "rgba(243, 197, 86, 0.07)",
+                borderRadius: 12,
+                padding: 12,
+                gap: 6,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.22)",
+              }}
+            >
+              <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+                HOW TO READ YOUR DAILY PANCHANG
+              </Text>
+              {PANCHANG_GUIDE.map((item) => (
+                <Text
+                  key={item.label}
+                  style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}
+                >
+                  <Text style={{ color: "#F6E7B8", fontWeight: "700" }}>
+                    {item.label}:{" "}
+                  </Text>
+                  {item.desc}
+                </Text>
+              ))}
+            </View>
+          )}
 
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {[

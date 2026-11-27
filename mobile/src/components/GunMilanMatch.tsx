@@ -20,6 +20,7 @@ export function GunMilanMatch() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<GunMilanResult | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     if (selectedPlace || placeText.trim().length < 2) {
@@ -300,6 +301,52 @@ export function GunMilanMatch() {
           >
             ✦ 8-Fold Ashtakoota Breakdown
           </Text>
+
+          <Pressable
+            onPress={() => setShowGuide(!showGuide)}
+            style={{
+              alignSelf: "flex-start",
+              backgroundColor: showGuide ? "rgba(243, 197, 86, 0.2)" : "rgba(255, 255, 255, 0.06)",
+              borderWidth: 1,
+              borderColor: showGuide ? C.gold : "rgba(255, 255, 255, 0.14)",
+              borderRadius: 8,
+              paddingHorizontal: 9,
+              paddingVertical: 4,
+            }}
+          >
+            <Text style={{ color: showGuide ? C.gold : C.text, fontSize: 11, fontWeight: "600" }}>
+              {showGuide ? "Hide Score Guide" : "? How to read your 36-point Gun Milan score"}
+            </Text>
+          </Pressable>
+
+          {showGuide && (
+            <View
+              style={{
+                backgroundColor: "rgba(243, 197, 86, 0.07)",
+                borderRadius: 12,
+                padding: 12,
+                gap: 6,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.22)",
+              }}
+            >
+              <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+                INTERPRETING ASHTAKOOTA GUN MILAN (36 POINTS)
+              </Text>
+              <Text style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}>
+                • <Text style={{ color: "#7FE0A8", fontWeight: "700" }}>32–36 Points (Ati Uttama):</Text> Exceptional compatibility across mind, vitality, and harmony.
+              </Text>
+              <Text style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}>
+                • <Text style={{ color: "#7FE0A8", fontWeight: "700" }}>25–31 Points (Uttama):</Text> Very strong marriage &amp; partnership foundation.
+              </Text>
+              <Text style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}>
+                • <Text style={{ color: C.gold, fontWeight: "700" }}>18–24 Points (Madhyama):</Text> Good acceptable match with balanced understanding.
+              </Text>
+              <Text style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}>
+                • <Text style={{ color: "#FFB4AB", fontWeight: "700" }}>Below 18 Points:</Text> Differences in temperament/vitality; check Bhakoot/Nadi cancellations and consult AI Pandit.
+              </Text>
+            </View>
+          )}
 
           {result.kootas.map((k) => {
             const ratio = k.score / k.max;

@@ -8,6 +8,12 @@ import { GunMilanMatch } from "../components/GunMilanMatch";
 import { ZodiacIcon } from "../components/ZodiacBadge";
 import { KundliData, Screen } from "../types";
 import { C } from "../theme/colors";
+import {
+  AVAKHADA_GUIDE,
+  CHART_GUIDES,
+  HOUSE_MEANINGS,
+  PLANET_MEANINGS,
+} from "../theme/astroGuide";
 import { formatTitleCase } from "../theme/i18n";
 import { s } from "../theme/styles";
 
@@ -73,6 +79,8 @@ export function KundliScreen({
   const [tab, setTab] = useState<"Chart" | "Planets" | "Match" | "Insights" | "Dasha">("Chart");
   const [chartType, setChartType] = useState<ChartVariant>("lagna");
   const [chartStyle, setChartStyle] = useState<ChartStyleMode>("north");
+  const [showChartGuide, setShowChartGuide] = useState(false);
+  const [showAvakhadaGuide, setShowAvakhadaGuide] = useState(false);
 
   const displayName = formatTitleCase(name) || "Your";
 
@@ -322,6 +330,118 @@ export function KundliScreen({
             chartType={activeChartType}
             chartStyle={chartStyle}
           />
+
+          {/* Active Chart Explanation & Tap-to-Learn Houses Guide */}
+          <View
+            style={{
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: "rgba(243, 197, 86, 0.22)",
+              backgroundColor: "rgba(18, 16, 28, 0.72)",
+              padding: 14,
+              gap: 10,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Text style={{ color: C.gold, fontSize: 12.5, fontWeight: "700", flex: 1 }}>
+                {CHART_GUIDES[activeChartType]?.title}
+              </Text>
+              <Pressable
+                onPress={() => setShowChartGuide(!showChartGuide)}
+                style={{
+                  backgroundColor: showChartGuide
+                    ? "rgba(243, 197, 86, 0.2)"
+                    : "rgba(255, 255, 255, 0.06)",
+                  borderWidth: 1,
+                  borderColor: showChartGuide ? C.gold : "rgba(255, 255, 255, 0.14)",
+                  borderRadius: 8,
+                  paddingHorizontal: 9,
+                  paddingVertical: 4,
+                }}
+              >
+                <Text
+                  style={{
+                    color: showChartGuide ? C.gold : C.text,
+                    fontSize: 11,
+                    fontWeight: "600",
+                  }}
+                >
+                  {showChartGuide ? "Close Guide" : "? How to Read"}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={{ color: C.secondary, fontSize: 12, lineHeight: 18 }}>
+              {CHART_GUIDES[activeChartType]?.summary}
+            </Text>
+
+            {showChartGuide && (
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: "rgba(255, 255, 255, 0.08)",
+                  paddingTop: 10,
+                  gap: 10,
+                }}
+              >
+                <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+                  PLANET SYMBOLS ON CHART
+                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                  {Object.entries(PLANET_MEANINGS).map(([pName, info]) => (
+                    <View
+                      key={pName}
+                      style={{
+                        backgroundColor: "rgba(255,255,255,0.05)",
+                        borderRadius: 8,
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "600" }}>
+                        {info.symbol} = {pName}
+                      </Text>
+                    </View>
+                  ))}
+                  <View
+                    style={{
+                      backgroundColor: "rgba(243, 197, 86, 0.12)",
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                    }}
+                  >
+                    <Text style={{ color: C.gold, fontSize: 11, fontWeight: "600" }}>
+                      * = Retrograde (Vakri)
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700", marginTop: 2 }}>
+                  THE 12 HOUSES (BHAVAS) EXPLAINED
+                </Text>
+                <View style={{ gap: 6 }}>
+                  {Object.entries(HOUSE_MEANINGS).map(([hNum, hData]) => (
+                    <Text
+                      key={hNum}
+                      style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}
+                    >
+                      <Text style={{ color: "#F6E7B8", fontWeight: "700" }}>
+                        {hData.title}:{" "}
+                      </Text>
+                      {hData.meaning}
+                    </Text>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
 
           {/* 3 Core Identity Pills */}
           <View style={{ flexDirection: "row", gap: 8 }}>
@@ -604,17 +724,78 @@ export function KundliScreen({
               gap: 12,
             }}
           >
-            <Text
+            <View
               style={{
-                color: C.gold,
-                fontSize: 11,
-                fontWeight: "700",
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              ✦ Avakhada Chakra &amp; Gun Milan Profile
-            </Text>
+              <Text
+                style={{
+                  color: C.gold,
+                  fontSize: 11,
+                  fontWeight: "700",
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                }}
+              >
+                ✦ Avakhada Chakra &amp; Profile
+              </Text>
+              <Pressable
+                onPress={() => setShowAvakhadaGuide(!showAvakhadaGuide)}
+                style={{
+                  backgroundColor: showAvakhadaGuide
+                    ? "rgba(243, 197, 86, 0.2)"
+                    : "rgba(255, 255, 255, 0.06)",
+                  borderWidth: 1,
+                  borderColor: showAvakhadaGuide
+                    ? C.gold
+                    : "rgba(255, 255, 255, 0.14)",
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                }}
+              >
+                <Text
+                  style={{
+                    color: showAvakhadaGuide ? C.gold : C.text,
+                    fontSize: 10.5,
+                    fontWeight: "600",
+                  }}
+                >
+                  {showAvakhadaGuide ? "Close" : "? Guide"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {showAvakhadaGuide && (
+              <View
+                style={{
+                  backgroundColor: "rgba(243, 197, 86, 0.07)",
+                  borderRadius: 12,
+                  padding: 12,
+                  gap: 6,
+                  borderWidth: 1,
+                  borderColor: "rgba(243, 197, 86, 0.22)",
+                }}
+              >
+                <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+                  UNDERSTANDING AVAKHADA ATTRIBUTES
+                </Text>
+                {Object.entries(AVAKHADA_GUIDE).map(([k, desc]) => (
+                  <Text
+                    key={k}
+                    style={{ color: "#EAE3D2", fontSize: 11.5, lineHeight: 17 }}
+                  >
+                    <Text style={{ color: "#F6E7B8", fontWeight: "700" }}>
+                      {k}:{" "}
+                    </Text>
+                    {desc}
+                  </Text>
+                ))}
+              </View>
+            )}
 
             {[
               ["Varna", kundli.avakhada?.varna || "—"],
