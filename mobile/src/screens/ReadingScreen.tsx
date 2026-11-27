@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { Button } from "../components/Button";
 import { TarotArt } from "../components/TarotArt";
 import { Screen, TarotReading } from "../types";
@@ -20,14 +21,51 @@ const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
 type CardItem = TarotReading["cards"][number];
 
+const ROMAN_SLOTS = ["I", "II", "III"];
+
+function SparkleGlyph({ size = 13, color = C.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M12 2L14.3 9.7L22 12L14.3 14.3L12 22L9.7 14.3L2 12L9.7 9.7L12 2Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+function SacredDivider() {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: "rgba(243, 197, 86, 0.22)",
+        }}
+      />
+      <Text style={{ color: C.gold, fontSize: 11 }}>✦</Text>
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: "rgba(243, 197, 86, 0.22)",
+        }}
+      />
+    </View>
+  );
+}
+
 function FlipCard({
   card,
+  index,
   flipped,
   onFlip,
   isSingle,
   isYesNo,
 }: {
   card: CardItem;
+  index: number;
   flipped: boolean;
   onFlip: () => void;
   isSingle: boolean;
@@ -75,7 +113,7 @@ function FlipCard({
   return (
     <View
       style={{
-        width: isSingle ? 185 : "31%",
+        width: isSingle ? 190 : "31%",
         alignItems: "center",
         gap: 8,
       }}
@@ -84,18 +122,18 @@ function FlipCard({
         accessibilityRole="button"
         accessibilityLabel={
           flipped
-            ? `${card.name} (${card.position}) — tap to view back`
+            ? `${card.name} (${card.position}) — tap to inspect card back`
             : `Tap to flip ${card.position} card`
         }
         onPress={onFlip}
         style={{
           width: "100%",
           aspectRatio: 0.56,
-          minHeight: isSingle ? 310 : 168,
+          minHeight: isSingle ? 316 : 172,
           position: "relative",
         }}
       >
-        {/* Unflipped Back Face (card_back.png) */}
+        {/* Unflipped Sacred Back (card_back.png) */}
         <Animated.View
           pointerEvents={flipped ? "none" : "auto"}
           style={{
@@ -121,7 +159,7 @@ function FlipCard({
           />
         </Animated.View>
 
-        {/* Flipped Front Face */}
+        {/* Illuminated Gold-Foil Parchment Front Face */}
         <Animated.View
           pointerEvents={flipped ? "auto" : "none"}
           style={{
@@ -136,104 +174,164 @@ function FlipCard({
               { rotateY: frontRotate },
               { scale: frontScale },
             ],
-            borderRadius: 12,
+            borderRadius: 14,
             borderWidth: 1.5,
             borderColor: C.gold,
-            backgroundColor: "#F5F1E7",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 8,
-            paddingHorizontal: 5,
+            backgroundColor: "#F6EFE0",
+            padding: 5,
+            shadowColor: C.gold,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 10,
+            elevation: 6,
           }}
         >
+          {/* Inner Sacred Filigree Frame */}
           <View
             style={{
-              width: "100%",
               flex: 1,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: "rgba(155, 107, 19, 0.36)",
+              paddingVertical: 6,
+              paddingHorizontal: 5,
               alignItems: "center",
-              justifyContent: "space-around",
-              transform: isReversed ? [{ rotate: "180deg" }] : undefined,
+              justifyContent: "space-between",
             }}
           >
-            <Text style={{ color: "#31281B", fontSize: 11, fontWeight: "700" }}>
-              {card.numeral}
-            </Text>
-            <TarotArt artKey={card.artKey} />
-            <Text
-              style={{
-                color: "#31281B",
-                fontSize: isSingle ? 13 : 10,
-                textAlign: "center",
-                fontWeight: "700",
-                paddingHorizontal: 2,
-              }}
-              numberOfLines={2}
-            >
-              {card.name}
-            </Text>
-          </View>
-          {isYesNo && card.yesNo ? (
+            {/* Top Corner Stars */}
             <View
               style={{
-                paddingHorizontal: 7,
-                paddingVertical: 2,
-                borderRadius: 6,
-                backgroundColor:
-                  card.yesNo === "Yes"
-                    ? "rgba(46, 125, 50, 0.16)"
-                    : card.yesNo === "No"
-                      ? "rgba(198, 40, 40, 0.16)"
-                      : "rgba(155, 107, 19, 0.18)",
+                width: "100%",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingHorizontal: 2,
               }}
             >
+              <Text style={{ color: "#9B6B13", fontSize: 8 }}>✦</Text>
+              <Text style={{ color: "#4A3617", fontSize: 10.5, fontWeight: "700" }}>
+                {card.numeral}
+              </Text>
+              <Text style={{ color: "#9B6B13", fontSize: 8 }}>✦</Text>
+            </View>
+
+            {/* Sacred Symbol Emblem (Rotated 180deg if Reversed) */}
+            <View
+              style={{
+                flex: 1,
+                width: "100%",
+                alignItems: "center",
+                justifyContent: "center",
+                transform: isReversed ? [{ rotate: "180deg" }] : undefined,
+              }}
+            >
+              <TarotArt artKey={card.artKey} />
+            </View>
+
+            {/* Card Title & Seal */}
+            <View style={{ alignItems: "center", gap: 3, width: "100%" }}>
               <Text
                 style={{
-                  color: "#31281B",
-                  fontSize: 9.5,
-                  fontWeight: "800",
+                  color: "#291E10",
+                  fontSize: isSingle ? 14.5 : 10.5,
+                  lineHeight: isSingle ? 18 : 13,
+                  textAlign: "center",
+                  fontFamily: "CormorantGaramond_700Bold",
                 }}
+                numberOfLines={2}
               >
-                {card.yesNo.toUpperCase()}
+                {card.name}
               </Text>
+
+              {isYesNo && card.yesNo ? (
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 2,
+                    borderRadius: 999,
+                    backgroundColor:
+                      card.yesNo === "Yes"
+                        ? "rgba(46, 125, 50, 0.16)"
+                        : card.yesNo === "No"
+                          ? "rgba(198, 40, 40, 0.16)"
+                          : "rgba(155, 107, 19, 0.18)",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#31281B",
+                      fontSize: 9,
+                      fontWeight: "800",
+                      letterSpacing: 0.8,
+                    }}
+                  >
+                    {card.yesNo.toUpperCase()}
+                  </Text>
+                </View>
+              ) : card.keywords?.[0] ? (
+                <Text
+                  style={{
+                    color: "#7C5A21",
+                    fontSize: 9,
+                    fontWeight: "700",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.8,
+                  }}
+                  numberOfLines={1}
+                >
+                  {card.keywords[0]}
+                </Text>
+              ) : null}
             </View>
-          ) : card.keywords?.[0] ? (
-            <Text
-              style={{
-                color: "#6B5630",
-                fontSize: 9.5,
-                fontWeight: "600",
-                textTransform: "capitalize",
-              }}
-              numberOfLines={1}
-            >
-              {card.keywords[0]}
-            </Text>
-          ) : null}
+          </View>
         </Animated.View>
       </Pressable>
 
-      {/* Card Label Below */}
-      <Text style={{ color: C.gold, fontWeight: "700", fontSize: 12 }}>
-        {card.position}
+      {/* Pedestal Label */}
+      <Text
+        style={{
+          color: C.gold,
+          fontWeight: "700",
+          fontSize: 11,
+          letterSpacing: 0.9,
+          textTransform: "uppercase",
+        }}
+      >
+        {ROMAN_SLOTS[index] || ""} · {card.position}
       </Text>
       {flipped ? (
-        <Text
+        <View
           style={{
-            color: isReversed ? "#FFB4AB" : "#7FE0A8",
-            fontSize: 11,
-            fontWeight: "600",
+            paddingHorizontal: 8,
+            paddingVertical: 2,
+            borderRadius: 999,
+            backgroundColor: isReversed
+              ? "rgba(255, 180, 171, 0.1)"
+              : "rgba(127, 224, 168, 0.1)",
+            borderWidth: 1,
+            borderColor: isReversed
+              ? "rgba(255, 180, 171, 0.3)"
+              : "rgba(127, 224, 168, 0.3)",
           }}
         >
-          {isReversed ? "Reversed ↺" : "Upright ↑"}
-        </Text>
+          <Text
+            style={{
+              color: isReversed ? "#FFB4AB" : "#7FE0A8",
+              fontSize: 10.5,
+              fontWeight: "700",
+            }}
+          >
+            {isReversed ? "Reversed ↺" : "Upright ↑"}
+          </Text>
+        </View>
       ) : (
         <View
           style={{
             backgroundColor: "rgba(243, 197, 86, 0.14)",
             borderWidth: 1,
-            borderColor: "rgba(243, 197, 86, 0.4)",
-            borderRadius: 8,
-            paddingHorizontal: 8,
+            borderColor: "rgba(243, 197, 86, 0.35)",
+            borderRadius: 999,
+            paddingHorizontal: 9,
             paddingVertical: 2,
           }}
         >
@@ -259,7 +357,6 @@ export function ReadingScreen({
     reading ? reading.cards.map(() => Boolean(reading.fromJournal)) : [],
   );
 
-  // Sync and smoothly auto-flip fresh cards sequentially so picked cards always turn over & reveal prediction
   useEffect(() => {
     if (!reading) {
       setFlippedMap([]);
@@ -301,10 +398,13 @@ export function ReadingScreen({
 
   if (!reading)
     return (
-      <ScrollView contentContainerStyle={s.page} showsVerticalScrollIndicator={false}>
-        <Text style={s.title}>Your Reading</Text>
-        <Text style={s.sub}>Choose cards to see your personal reading.</Text>
-        <Button label="Pick cards" onPress={onDrawAgain} />
+      <ScrollView
+        contentContainerStyle={[s.page, { paddingTop: 22 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={s.title}>Sacred Reading</Text>
+        <Text style={s.sub}>Choose cards from the Tarot Sanctuary to unveil guidance.</Text>
+        <Button label="Open Tarot Deck" onPress={onDrawAgain} />
       </ScrollView>
     );
 
@@ -328,49 +428,61 @@ export function ReadingScreen({
       contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 48, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Title & Mode (No App Bar or Back Button) */}
+      {/* Sacred Editorial Header (No App Bar or Back Button) */}
       <View style={{ gap: 6 }}>
-        <Text
-          style={{
-            color: C.gold,
-            fontSize: 11,
-            fontWeight: "700",
-            textTransform: "uppercase",
-            letterSpacing: 1.6,
-          }}
-        >
-          ✦{" "}
-          {reading.mode === "daily"
-            ? "Daily Card Draw"
-            : isYesNo
-              ? "Yes / No Oracle"
-              : "3-Card Spread"}{" "}
-          • {reading.topic}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <SparkleGlyph size={12} />
+          <Text
+            style={{
+              color: C.gold,
+              fontSize: 11,
+              fontWeight: "700",
+              textTransform: "uppercase",
+              letterSpacing: 1.6,
+            }}
+          >
+            {reading.mode === "daily"
+              ? "Daily Card Draw"
+              : isYesNo
+                ? "Yes / No Oracle"
+                : "3-Card Spread"}{" "}
+            • {reading.topic}
+          </Text>
+        </View>
         <Text style={s.title}>
-          {allFlipped ? "Your Oracle Reading" : "Turning Your Cards…"}
+          {allFlipped ? "Oracle Prophecy" : "Turning Your Cards…"}
         </Text>
+
         {reading.question ? (
           <View
             style={{
-              backgroundColor: "rgba(243, 197, 86, 0.1)",
-              borderLeftWidth: 3,
+              backgroundColor: "rgba(243, 197, 86, 0.08)",
+              borderLeftWidth: 2.5,
               borderLeftColor: C.gold,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 6,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              borderRadius: 10,
               marginTop: 4,
+              gap: 3,
             }}
           >
-            <Text style={{ color: C.muted, fontSize: 12, fontWeight: "600" }}>
-              Your Question:
+            <Text
+              style={{
+                color: C.gold,
+                fontSize: 10.5,
+                fontWeight: "700",
+                letterSpacing: 1.2,
+                textTransform: "uppercase",
+              }}
+            >
+              Sankalpa · Your Question
             </Text>
             <Text
               style={{
-                color: "#F6E7B8",
+                color: "#F7F3EA",
                 fontStyle: "italic",
-                fontSize: 14,
-                marginTop: 2,
+                fontSize: 15,
+                lineHeight: 22,
               }}
             >
               &ldquo;{reading.question}&rdquo;
@@ -379,18 +491,19 @@ export function ReadingScreen({
         ) : (
           <Text style={s.sub}>
             {allFlipped
-              ? `Tailored prediction & guidance for ${reading.topic.toLowerCase()}. Tap any card to flip between front & back.`
-              : "Watch your chosen cards turn over to unveil their prediction."}
+              ? `Tailored ${reading.topic.toLowerCase()} guidance. Tap any card to view its sacred back.`
+              : "Watch your selected cards turn over to reveal their sacred message."}
           </Text>
         )}
       </View>
 
-      {/* Drawn Cards Display (3D Flip Animation with Custom Card Back & Front) */}
+      {/* Drawn Cards Display (3D Sequential Flip Reveal) */}
       <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
         {reading.cards.map((card, idx) => (
           <FlipCard
-            key={card.position + card.name}
+            key={card.cardId + card.position}
             card={card}
+            index={idx}
             flipped={Boolean(flippedMap[idx])}
             onFlip={() => toggleCardAt(idx)}
             isSingle={reading.cards.length === 1}
@@ -399,22 +512,25 @@ export function ReadingScreen({
         ))}
       </View>
 
-      {/* Veiled Prompt OR Full Revealed Reading */}
+      {/* Veiled Prompt OR Illuminated Spiritual Synthesis */}
       {!allFlipped ? (
         <View
           style={{
-            borderRadius: 20,
+            borderRadius: 22,
             borderWidth: 1,
             borderColor: "rgba(243, 197, 86, 0.3)",
-            backgroundColor: "rgba(18, 16, 28, 0.78)",
+            backgroundColor: "rgba(18, 16, 28, 0.8)",
             padding: 20,
             alignItems: "center",
             gap: 12,
           }}
         >
-          <Text style={{ color: C.gold, fontSize: 13, fontWeight: "700" }}>
-            ✨ {flippedCount} of {totalCount} Cards Revealed
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <SparkleGlyph size={14} />
+            <Text style={{ color: C.gold, fontSize: 13, fontWeight: "700" }}>
+              {flippedCount} of {totalCount} Cards Unveiled
+            </Text>
+          </View>
           <Text
             style={{
               color: C.secondary,
@@ -423,49 +539,45 @@ export function ReadingScreen({
               lineHeight: 20,
             }}
           >
-            Your personalized {reading.topic.toLowerCase()} prediction unlocks momentarily…
+            Your tailored {reading.topic.toLowerCase()} prophecy unlocks momentarily…
           </Text>
           <Button label="Reveal All Now" onPress={flipAllCards} />
         </View>
       ) : (
         <Animated.View style={{ gap: 16, opacity: readingFade }}>
-          {/* Yes / No Verdict Banner */}
+          {/* Yes / No Verdict Sanctum */}
           {isYesNo && (
             <View
               style={{
                 alignItems: "center",
-                padding: 16,
-                borderRadius: 16,
-                backgroundColor:
-                  primaryVerdict === "Yes"
-                    ? "rgba(127, 224, 168, 0.15)"
-                    : primaryVerdict === "No"
-                      ? "rgba(255, 128, 128, 0.15)"
-                      : "rgba(243, 197, 86, 0.15)",
+                padding: 18,
+                borderRadius: 20,
+                backgroundColor: "rgba(18, 16, 28, 0.85)",
                 borderWidth: 1,
                 borderColor:
                   primaryVerdict === "Yes"
-                    ? "#7FE0A8"
+                    ? "rgba(127, 224, 168, 0.45)"
                     : primaryVerdict === "No"
-                      ? "#FF8080"
-                      : C.gold,
+                      ? "rgba(255, 128, 128, 0.45)"
+                      : "rgba(243, 197, 86, 0.45)",
                 gap: 4,
               }}
             >
               <Text
                 style={{
                   color: C.muted,
-                  fontSize: 12,
+                  fontSize: 11,
+                  fontWeight: "700",
                   textTransform: "uppercase",
-                  letterSpacing: 1,
+                  letterSpacing: 1.4,
                 }}
               >
-                Oracle Verdict
+                ✦ Oracle Verdict
               </Text>
               <Text
                 style={{
-                  fontSize: 28,
-                  fontWeight: "800",
+                  fontSize: 34,
+                  fontFamily: "CormorantGaramond_700Bold",
                   color:
                     primaryVerdict === "Yes"
                       ? "#7FE0A8"
@@ -479,62 +591,209 @@ export function ReadingScreen({
             </View>
           )}
 
-          {/* Narrative Synthesis & Individual Card Predictions */}
-          <View style={[s.card, { gap: 14, padding: 18 }]}>
-            <Text style={s.tileTitle}>Prediction & Synthesis</Text>
-            <Text style={[s.cardText, { lineHeight: 22, color: "#F0EAD6" }]}>
-              {reading.interpretation ||
-                "Reflect on these symbols as gentle prompts, not predictions."}
-            </Text>
-
+          {/* Celestial Oracle Synthesis Card (Matching HomeScreen Cosmic Guidance) */}
+          <View
+            style={{
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: "rgba(243, 197, 86, 0.34)",
+              backgroundColor: "rgba(18, 16, 28, 0.84)",
+              padding: 20,
+              gap: 16,
+              shadowColor: C.gold,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 5,
+            }}
+          >
             <View
               style={{
-                height: 1,
-                backgroundColor: "rgba(255,255,255,0.08)",
-                marginVertical: 4,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
-            />
-
-            {reading.cards.map((card) => (
-              <View key={card.name + card.position} style={{ gap: 4 }}>
-                <Text style={{ color: C.gold, fontWeight: "700", fontSize: 14 }}>
-                  {card.position}: {card.name} ({card.orientation || "upright"})
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+                <SparkleGlyph size={14} />
+                <Text
+                  style={{
+                    color: C.gold,
+                    fontWeight: "700",
+                    fontSize: 11,
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Cosmic Prophecy & Guidance
                 </Text>
-                {card.keywords && card.keywords.length > 0 && (
-                  <Text
+              </View>
+              <View
+                style={{
+                  backgroundColor: "rgba(243, 197, 86, 0.12)",
+                  borderWidth: 1,
+                  borderColor: "rgba(243, 197, 86, 0.3)",
+                  paddingHorizontal: 10,
+                  paddingVertical: 3,
+                  borderRadius: 999,
+                }}
+              >
+                <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "700" }}>
+                  {reading.topic}
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={{
+                color: "#F7F3EA",
+                fontSize: 15.5,
+                lineHeight: 24,
+                letterSpacing: 0.2,
+              }}
+            >
+              {reading.interpretation ||
+                "Reflect on these sacred symbols with calm awareness and steady purpose."}
+            </Text>
+
+            <SacredDivider />
+
+            {/* Individual Card Archetype Breakdown */}
+            <View style={{ gap: 12 }}>
+              {reading.cards.map((card, i) => (
+                <View
+                  key={card.cardId + card.position}
+                  style={{
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: "rgba(243, 197, 86, 0.18)",
+                    backgroundColor: "rgba(255, 255, 255, 0.03)",
+                    padding: 14,
+                    gap: 8,
+                  }}
+                >
+                  <View
                     style={{
-                      color: C.muted,
-                      fontSize: 12,
-                      fontStyle: "italic",
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 8,
                     }}
                   >
-                    Keywords: {card.keywords.join(" • ")}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: C.gold,
+                          fontSize: 10.5,
+                          fontWeight: "700",
+                          letterSpacing: 1.1,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {ROMAN_SLOTS[i] || ""} · {card.position}
+                      </Text>
+                      <Text
+                        style={{
+                          color: "#F7F3EA",
+                          fontSize: 20,
+                          fontFamily: "CormorantGaramond_700Bold",
+                        }}
+                      >
+                        {card.name}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color:
+                          card.orientation === "reversed" ? "#FFB4AB" : "#7FE0A8",
+                        fontSize: 11,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {card.orientation === "reversed" ? "Reversed ↺" : "Upright ↑"}
+                    </Text>
+                  </View>
+
+                  {card.keywords && card.keywords.length > 0 && (
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                      {card.keywords.map((kw) => (
+                        <View
+                          key={kw}
+                          style={{
+                            backgroundColor: "rgba(243, 197, 86, 0.09)",
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#E8D7A7",
+                              fontSize: 10.5,
+                              fontWeight: "600",
+                              textTransform: "capitalize",
+                            }}
+                          >
+                            {kw}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  <Text style={{ color: "#EFEAE0", fontSize: 13.5, lineHeight: 20 }}>
+                    {card.topicInsight || card.meaning}
                   </Text>
-                )}
-                <Text style={[s.cardText, { color: C.text, fontSize: 13 }]}>
-                  {card.topicInsight || card.meaning}
-                </Text>
-                {card.topicInsight && card.meaning && card.topicInsight !== card.meaning && (
-                  <Text style={{ color: C.secondary, fontSize: 12 }}>
-                    Core Meaning: {card.meaning}
-                  </Text>
-                )}
-                {card.advice && (
-                  <Text style={{ color: "#B8E2F2", fontSize: 12, marginTop: 2 }}>
-                    💡 Advice: {card.advice}
-                  </Text>
-                )}
-              </View>
-            ))}
+
+                  {card.topicInsight &&
+                    card.meaning &&
+                    card.topicInsight !== card.meaning && (
+                      <Text style={{ color: C.secondary, fontSize: 12, lineHeight: 18 }}>
+                        Arcana Root: {card.meaning}
+                      </Text>
+                    )}
+
+                  {card.advice && (
+                    <View
+                      style={{
+                        backgroundColor: "rgba(243, 197, 86, 0.08)",
+                        borderLeftWidth: 2.5,
+                        borderLeftColor: C.gold,
+                        borderRadius: 8,
+                        paddingHorizontal: 11,
+                        paddingVertical: 8,
+                        gap: 2,
+                        marginTop: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: C.gold,
+                          fontSize: 10,
+                          fontWeight: "700",
+                          letterSpacing: 1,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        Divine Counsel
+                      </Text>
+                      <Text style={{ color: "#EAE3D2", fontSize: 12.5, lineHeight: 18 }}>
+                        {card.advice}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
           </View>
         </Animated.View>
       )}
 
       {/* Action Buttons */}
       <View style={{ gap: 10 }}>
-        <Button label="Back to Tarot Deck" onPress={onDrawAgain} variant="glass" />
+        <Button label="Return to Tarot Sanctuary" onPress={onDrawAgain} variant="glass" />
         <Button
-          label="Ask AI Pandit about this reading"
+          label="Discuss Reading with AI Pandit"
           onPress={() => onNavigate("chat")}
         />
       </View>
@@ -543,3 +802,4 @@ export function ReadingScreen({
     </ScrollView>
   );
 }
+
