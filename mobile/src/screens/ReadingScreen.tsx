@@ -25,11 +25,13 @@ function FlipCard({
   flipped,
   onFlip,
   isSingle,
+  isYesNo,
 }: {
   card: CardItem;
   flipped: boolean;
   onFlip: () => void;
   isSingle: boolean;
+  isYesNo: boolean;
 }) {
   const flipAnim = useRef(new Animated.Value(flipped ? 1 : 0)).current;
   const nativeDriver = Platform.OS !== "web";
@@ -38,13 +40,12 @@ function FlipCard({
   useEffect(() => {
     Animated.timing(flipAnim, {
       toValue: flipped ? 1 : 0,
-      duration: 580,
+      duration: 560,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: nativeDriver,
     }).start();
   }, [flipped, flipAnim, nativeDriver]);
 
-  // Smooth 3D cross-rotate flip: 0 -> 90deg back fades out, -90deg -> 0 front fades in
   const backOpacity = flipAnim.interpolate({
     inputRange: [0, 0.49, 0.5, 1],
     outputRange: [1, 1, 0, 0],
@@ -55,7 +56,7 @@ function FlipCard({
   });
   const backScale = flipAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [1, 1.07, 1.07],
+    outputRange: [1, 1.05, 1.05],
   });
 
   const frontOpacity = flipAnim.interpolate({
@@ -68,14 +69,13 @@ function FlipCard({
   });
   const frontScale = flipAnim.interpolate({
     inputRange: [0, 0.5, 1],
-    outputRange: [1.07, 1.07, 1],
+    outputRange: [1.05, 1.05, 1],
   });
 
   return (
     <View
       style={{
-        flex: 1,
-        maxWidth: isSingle ? 200 : undefined,
+        width: isSingle ? 185 : "31%",
         alignItems: "center",
         gap: 8,
       }}
@@ -84,13 +84,14 @@ function FlipCard({
         accessibilityRole="button"
         accessibilityLabel={
           flipped
-            ? `${card.name} (${card.position})`
+            ? `${card.name} (${card.position}) — tap to view back`
             : `Tap to flip ${card.position} card`
         }
         onPress={onFlip}
         style={{
           width: "100%",
           aspectRatio: 0.56,
+          minHeight: isSingle ? 310 : 168,
           position: "relative",
         }}
       >
@@ -140,14 +141,15 @@ function FlipCard({
             borderColor: C.gold,
             backgroundColor: "#F5F1E7",
             alignItems: "center",
-            justifyContent: "space-around",
-            padding: 6,
+            justifyContent: "space-between",
+            paddingVertical: 8,
+            paddingHorizontal: 5,
           }}
         >
           <View
             style={{
               width: "100%",
-              height: "100%",
+              flex: 1,
               alignItems: "center",
               justifyContent: "space-around",
               transform: isReversed ? [{ rotate: "180deg" }] : undefined,
@@ -160,15 +162,53 @@ function FlipCard({
             <Text
               style={{
                 color: "#31281B",
-                fontSize: 10.5,
+                fontSize: isSingle ? 13 : 10,
                 textAlign: "center",
                 fontWeight: "700",
                 paddingHorizontal: 2,
               }}
+              numberOfLines={2}
             >
               {card.name}
             </Text>
           </View>
+          {isYesNo && card.yesNo ? (
+            <View
+              style={{
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor:
+                  card.yesNo === "Yes"
+                    ? "rgba(46, 125, 50, 0.16)"
+                    : card.yesNo === "No"
+                      ? "rgba(198, 40, 40, 0.16)"
+                      : "rgba(155, 107, 19, 0.18)",
+              }}
+            >
+              <Text
+                style={{
+                  color: "#31281B",
+                  fontSize: 9.5,
+                  fontWeight: "800",
+                }}
+              >
+                {card.yesNo.toUpperCase()}
+              </Text>
+            </View>
+          ) : card.keywords?.[0] ? (
+            <Text
+              style={{
+                color: "#6B5630",
+                fontSize: 9.5,
+                fontWeight: "600",
+                textTransform: "capitalize",
+              }}
+              numberOfLines={1}
+            >
+              {card.keywords[0]}
+            </Text>
+          ) : null}
         </Animated.View>
       </Pressable>
 
@@ -198,7 +238,7 @@ function FlipCard({
           }}
         >
           <Text style={{ color: "#F6E7B8", fontSize: 10.5, fontWeight: "600" }}>
-            Tap to Flip
+            Revealing…
           </Text>
         </View>
       )}
@@ -219,13 +259,29 @@ export function ReadingScreen({
     reading ? reading.cards.map(() => Boolean(reading.fromJournal)) : [],
   );
 
-  // Sync flipped array whenever a new reading is loaded
+  // Sync and smoothly auto-flip fresh cards sequentially so picked cards always turn over & reveal prediction
   useEffect(() => {
-    if (reading) {
-      setFlippedMap(reading.cards.map(() => Boolean(reading.fromJournal)));
-    } else {
+    if (!reading) {
       setFlippedMap([]);
+      return;
     }
+    if (reading.fromJournal) {
+      setFlippedMap(reading.cards.map(() => true));
+      return;
+    }
+    setFlippedMap(reading.cards.map(() => false));
+    const timers: ReturnType<typeof setTimeout>[] = reading.cards.map((_, idx) =>
+      setTimeout(() => {
+        setFlippedMap((prev) => {
+          const next = [...prev];
+          next[idx] = true;
+          return next;
+        });
+      }, 280 + idx * 320),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, [reading]);
 
   const readingFade = useRef(new Animated.Value(0)).current;
@@ -238,7 +294,7 @@ export function ReadingScreen({
   useEffect(() => {
     Animated.timing(readingFade, {
       toValue: allFlipped ? 1 : 0,
-      duration: 500,
+      duration: 420,
       useNativeDriver: nativeDriver,
     }).start();
   }, [allFlipped, readingFade, nativeDriver]);
@@ -255,11 +311,10 @@ export function ReadingScreen({
   const isYesNo = reading.mode === "yesNo";
   const primaryVerdict = reading.cards[0]?.yesNo || "Yes";
 
-  const flipCardAt = (index: number) => {
+  const toggleCardAt = (index: number) => {
     setFlippedMap((prev) => {
-      if (prev[index]) return prev;
       const next = [...prev];
-      next[index] = true;
+      next[index] = !next[index];
       return next;
     });
   };
@@ -270,18 +325,18 @@ export function ReadingScreen({
 
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingBottom: 40, gap: 18 }]}
+      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 48, gap: 18 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Title & Mode */}
+      {/* Title & Mode (No App Bar or Back Button) */}
       <View style={{ gap: 6 }}>
         <Text
           style={{
             color: C.gold,
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: "700",
             textTransform: "uppercase",
-            letterSpacing: 1.4,
+            letterSpacing: 1.6,
           }}
         >
           ✦{" "}
@@ -293,7 +348,7 @@ export function ReadingScreen({
           • {reading.topic}
         </Text>
         <Text style={s.title}>
-          {allFlipped ? "Your Oracle Reading" : "Tap to Reveal Your Cards"}
+          {allFlipped ? "Your Oracle Reading" : "Turning Your Cards…"}
         </Text>
         {reading.question ? (
           <View
@@ -324,21 +379,22 @@ export function ReadingScreen({
         ) : (
           <Text style={s.sub}>
             {allFlipped
-              ? `Wisdom for your current path in ${reading.topic.toLowerCase()}.`
-              : "Tap each face-down card to flip it and unveil its sacred message."}
+              ? `Tailored prediction & guidance for ${reading.topic.toLowerCase()}. Tap any card to flip between front & back.`
+              : "Watch your chosen cards turn over to unveil their prediction."}
           </Text>
         )}
       </View>
 
-      {/* Drawn Cards Display (with 3D Flip Animation & Custom Back Design) */}
+      {/* Drawn Cards Display (3D Flip Animation with Custom Card Back & Front) */}
       <View style={{ flexDirection: "row", gap: 10, justifyContent: "center" }}>
         {reading.cards.map((card, idx) => (
           <FlipCard
             key={card.position + card.name}
             card={card}
             flipped={Boolean(flippedMap[idx])}
-            onFlip={() => flipCardAt(idx)}
+            onFlip={() => toggleCardAt(idx)}
             isSingle={reading.cards.length === 1}
+            isYesNo={isYesNo}
           />
         ))}
       </View>
@@ -367,9 +423,9 @@ export function ReadingScreen({
               lineHeight: 20,
             }}
           >
-            Your personalized Tarot synthesis and card meanings will unlock once all drawn cards are flipped face-up.
+            Your personalized {reading.topic.toLowerCase()} prediction unlocks momentarily…
           </Text>
-          <Button label="Flip All Cards" onPress={flipAllCards} />
+          <Button label="Reveal All Now" onPress={flipAllCards} />
         </View>
       ) : (
         <Animated.View style={{ gap: 16, opacity: readingFade }}>
@@ -423,9 +479,9 @@ export function ReadingScreen({
             </View>
           )}
 
-          {/* Narrative Synthesis & Individual Card Insights */}
+          {/* Narrative Synthesis & Individual Card Predictions */}
           <View style={[s.card, { gap: 14, padding: 18 }]}>
-            <Text style={s.tileTitle}>Synthesized Reading</Text>
+            <Text style={s.tileTitle}>Prediction & Synthesis</Text>
             <Text style={[s.cardText, { lineHeight: 22, color: "#F0EAD6" }]}>
               {reading.interpretation ||
                 "Reflect on these symbols as gentle prompts, not predictions."}
@@ -456,8 +512,13 @@ export function ReadingScreen({
                   </Text>
                 )}
                 <Text style={[s.cardText, { color: C.text, fontSize: 13 }]}>
-                  {card.meaning}
+                  {card.topicInsight || card.meaning}
                 </Text>
+                {card.topicInsight && card.meaning && card.topicInsight !== card.meaning && (
+                  <Text style={{ color: C.secondary, fontSize: 12 }}>
+                    Core Meaning: {card.meaning}
+                  </Text>
+                )}
                 {card.advice && (
                   <Text style={{ color: "#B8E2F2", fontSize: 12, marginTop: 2 }}>
                     💡 Advice: {card.advice}
@@ -471,7 +532,7 @@ export function ReadingScreen({
 
       {/* Action Buttons */}
       <View style={{ gap: 10 }}>
-        <Button label="Draw another spread" onPress={onDrawAgain} variant="glass" />
+        <Button label="Back to Tarot Deck" onPress={onDrawAgain} variant="glass" />
         <Button
           label="Ask AI Pandit about this reading"
           onPress={() => onNavigate("chat")}

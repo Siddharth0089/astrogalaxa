@@ -106,8 +106,11 @@ export type TarotReading = {
     orientation?: "upright" | "reversed";
     keywords?: string[];
     meaning: string;
+    topicInsight?: string;
     love?: string;
     career?: string;
+    money?: string;
+    health?: string;
     advice?: string;
     yesNo?: string;
   }[];

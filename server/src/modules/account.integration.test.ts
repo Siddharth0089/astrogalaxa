@@ -352,6 +352,17 @@ describe("tarot readings", () => {
       .set("Authorization", `Bearer ${token}`);
     expect(fullDeck.status).toBe(200);
     expect(fullDeck.body.data).toHaveLength(78);
+    const filteredDeck = await request(app)
+      .get("/tarot/cards?all=true&topic=Love&q=marriage")
+      .set("Authorization", `Bearer ${token}`);
+    expect(filteredDeck.status).toBe(200);
+    expect(filteredDeck.body.data.length).toBeGreaterThanOrEqual(8);
+    expect(filteredDeck.body.data.length).toBeLessThanOrEqual(30);
+    expect(
+      filteredDeck.body.data.every(
+        (card: Record<string, unknown>) => Object.keys(card).join() === "id",
+      ),
+    ).toBe(true);
     const quota = await request(app)
       .get("/tarot/quota")
       .set("Authorization", `Bearer ${token}`);
@@ -371,6 +382,20 @@ describe("tarot readings", () => {
           })
       ).status,
     ).toBe(429);
+    const moneyReading = await request(app)
+      .post("/tarot/readings")
+      .set("Authorization", `Bearer ${otherToken}`)
+      .send({
+        topic: "Money",
+        mode: "daily",
+        question: "Should I invest in savings?",
+        cardIds: [selection[0]],
+      });
+    expect(moneyReading.status).toBe(201);
+    expect(moneyReading.body.data.interpretation).toContain(
+      "Should I invest in savings?",
+    );
+    expect(moneyReading.body.data.cards[0].topicInsight).toBeTruthy();
   });
 });
 

@@ -423,6 +423,180 @@ tarotRouter.use(requireAuth);
 
 const MAX_DAILY_TAROT_CARDS = 3;
 
+const TOPIC_KEYWORDS: Record<string, string[]> = {
+  Career: [
+    "career", "work", "job", "promotion", "business", "boss", "office",
+    "interview", "study", "exam", "project", "leadership", "victory",
+    "mastery", "craft", "ambition", "teamwork", "vision", "planning",
+    "discipline", "initiative", "skill", "wands", "pentacles",
+  ],
+  Love: [
+    "love", "relationship", "partner", "marriage", "crush", "ex", "husband",
+    "wife", "dating", "romance", "soul", "heart", "bond", "family",
+    "harmony", "affection", "compassion", "union", "loyalty", "cups",
+  ],
+  Health: [
+    "health", "healing", "body", "recovery", "rest", "peace", "stress",
+    "anxiety", "sleep", "energy", "vitality", "balance", "moderation",
+    "wellbeing", "wellness", "calm", "strength", "renewal", "hope", "doctor",
+  ],
+  Money: [
+    "money", "wealth", "finance", "financial", "salary", "income", "invest",
+    "investment", "property", "house", "debt", "loan", "profit", "savings",
+    "prosperity", "abundance", "generosity", "security", "legacy", "pentacles",
+  ],
+  General: [],
+};
+
+const TOPIC_MAJOR_CARDS: Record<string, Set<string>> = {
+  Career: new Set([
+    "The Magician", "The Emperor", "The Hierophant", "The Chariot",
+    "Strength", "Justice", "Wheel of Fortune", "The Sun", "Judgement", "The World",
+  ]),
+  Love: new Set([
+    "The Lovers", "The Empress", "The High Priestess", "Strength",
+    "Temperance", "The Star", "The Sun", "The Moon", "The World",
+  ]),
+  Health: new Set([
+    "The Empress", "Strength", "Temperance", "The Star", "The Sun",
+    "The Hermit", "The Hanged Man", "Judgement", "The Fool",
+  ]),
+  Money: new Set([
+    "The Empress", "The Emperor", "The Magician", "Wheel of Fortune",
+    "Justice", "The Sun", "The World", "The Devil",
+  ]),
+  General: new Set(),
+};
+
+const FILTER_STOPWORDS = new Set([
+  "the", "and", "for", "with", "that", "this", "from", "will", "should",
+  "what", "when", "where", "which", "would", "could", "have", "about",
+  "into", "your", "mine", "they", "them", "been", "does", "doing", "getting",
+]);
+
+function extractQueryTokens(question: string): string[] {
+  return question
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !FILTER_STOPWORDS.has(w));
+}
+
+function scoreCardRelevance(
+  card: {
+    name?: string;
+    suit?: string;
+    keywords?: string[];
+    meanings?: Record<string, string>;
+  },
+  topic: string,
+  questionTokens: string[],
+): number {
+  let score = 0;
+  const suit = card.suit || "Major";
+  const name = card.name || "";
+
+  // Suit & Major Arcana resonance with Life Area
+  if (topic === "Career") {
+    if (suit === "Wands" || suit === "Pentacles") score += 6;
+    if (TOPIC_MAJOR_CARDS.Career.has(name)) score += 6;
+  } else if (topic === "Love") {
+    if (suit === "Cups") score += 7;
+    if (TOPIC_MAJOR_CARDS.Love.has(name)) score += 6;
+    if (name === "Four of Wands" || name === "Ten of Pentacles") score += 5;
+  } else if (topic === "Money") {
+    if (suit === "Pentacles") score += 7;
+    if (TOPIC_MAJOR_CARDS.Money.has(name)) score += 6;
+    if (name === "Three of Wands" || name === "Nine of Cups") score += 5;
+  } else if (topic === "Health") {
+    if (TOPIC_MAJOR_CARDS.Health.has(name)) score += 7;
+    if (suit === "Pentacles") score += 4;
+    if (suit === "Cups") score += 3;
+    if (
+      name === "Four of Swords" ||
+      name === "Six of Swords" ||
+      name === "Nine of Swords" ||
+      name === "Ten of Wands"
+    ) {
+      score += 6;
+    }
+  } else {
+    score += 1;
+  }
+
+  // Question & domain keyword matching across card symbols and meanings
+  const haystack = [
+    name,
+    suit,
+    ...(card.keywords || []),
+    card.meanings?.upright || "",
+    card.meanings?.reversed || "",
+    card.meanings?.love || "",
+    card.meanings?.career || "",
+    card.meanings?.advice || "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  for (const kw of TOPIC_KEYWORDS[topic] || []) {
+    if (haystack.includes(kw)) score += 1;
+  }
+  for (const token of questionTokens) {
+    if (haystack.includes(token)) score += 5;
+    for (const [domain, domainWords] of Object.entries(TOPIC_KEYWORDS)) {
+      if (domainWords.some((w) => w.includes(token) || token.includes(w))) {
+        if (
+          (domain === "Love" && suit === "Cups") ||
+          (domain === "Money" && suit === "Pentacles") ||
+          (domain === "Career" && (suit === "Wands" || suit === "Pentacles")) ||
+          (domain === "Health" && TOPIC_MAJOR_CARDS.Health.has(name))
+        ) {
+          score += 3;
+        }
+      }
+    }
+  }
+  return score;
+}
+
+function getCardTopicInsight(
+  meanings: Record<string, string> | undefined,
+  keywords: string[] | undefined,
+  topic: string,
+  isRev: boolean,
+): string {
+  const k1 = keywords?.[0] || "clarity";
+  const k2 = keywords?.[1] || "awareness";
+  const baseReversed = meanings?.reversed || "";
+  const baseUpright = meanings?.upright || "";
+
+  let raw = baseUpright;
+  if (topic === "Love") {
+    raw =
+      meanings?.love ||
+      `In love, nurture ${k1} and honest ${k2} to strengthen emotional harmony.`;
+  } else if (topic === "Career") {
+    raw =
+      meanings?.career ||
+      `In your career, channel ${k1} and disciplined ${k2} toward tangible progress.`;
+  } else if (topic === "Money") {
+    raw =
+      meanings?.money ||
+      `Financially, lean into ${k1} and prudent ${k2}; stay mindful before making commitments (${baseUpright.toLowerCase()}).`;
+  } else if (topic === "Health") {
+    raw =
+      meanings?.health ||
+      `For health & vitality, prioritize ${k1}, nervous-system balance, and restorative ${k2}.`;
+  }
+
+  if (isRev) {
+    return baseReversed
+      ? `${raw} (Reversed caution: watch for ${baseReversed.charAt(0).toLowerCase()}${baseReversed.slice(1)})`
+      : `${raw} (Reversed: slow down and address hidden blocks around ${k1}.)`;
+  }
+  return raw;
+}
+
 async function getTarotDailyQuota(userId: string) {
   const u = await User.findById(userId)
     .select("prefs.timezone birth.timezone")
@@ -454,6 +628,10 @@ tarotRouter.get(
   "/cards",
   asyncRoute(async (req, res) => {
     const showAll = req.query.all === "true";
+    const unfiltered = req.query.unfiltered === "true";
+    const topic = typeof req.query.topic === "string" ? req.query.topic : "General";
+    const question = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
     let cards = await TarotCard.find().sort({ number: 1 }).lean();
     if (showAll && cards.length < tarotContent.length) {
       await TarotCard.bulkWrite(
@@ -474,11 +652,47 @@ tarotRouter.get(
         "TAROT_UNAVAILABLE",
         "Tarot cards are not available yet",
       );
+
+    // Shuffle first so tied relevance scores vary fairly each shuffle
     for (let i = cards.length - 1; i > 0; i--) {
       const j = randomInt(i + 1);
       [cards[i], cards[j]] = [cards[j], cards[i]];
     }
-    const selected = showAll ? cards : cards.slice(0, 8);
+
+    const shouldFilter =
+      showAll &&
+      !unfiltered &&
+      ((topic && topic !== "General") || question.length > 0);
+
+    let selected = cards;
+    if (shouldFilter) {
+      const tokens = extractQueryTokens(question);
+      const ranked = cards
+        .map((c) => ({
+          card: c,
+          score: scoreCardRelevance(
+            c as {
+              name?: string;
+              suit?: string;
+              keywords?: string[];
+              meanings?: Record<string, string>;
+            },
+            topic,
+            tokens,
+          ),
+        }))
+        .sort((a, b) => b.score - a.score);
+      // 30 cards = 5 full rows of 6 aligned to their question & life area
+      selected = ranked.slice(0, Math.min(30, ranked.length)).map((r) => r.card);
+      // Re-shuffle selected relevant cards so positions remain unpredictable
+      for (let i = selected.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [selected[i], selected[j]] = [selected[j], selected[i]];
+      }
+    } else if (!showAll) {
+      selected = cards.slice(0, 8);
+    }
+
     ok(
       res,
       selected.map((card) => ({ id: card._id.toString() })),
@@ -551,6 +765,14 @@ tarotRouter.post(
       const orient = orientations[i] || "upright";
       const isRev = orient === "reversed";
       const posKey = (positions[i] || "").toLowerCase();
+      const meanings = c.meanings as Record<string, string> | undefined;
+      const rawYesNo = meanings?.yesNo || "Maybe";
+      const adjustedYesNo = isRev
+        ? rawYesNo === "Yes"
+          ? "Maybe"
+          : "No"
+        : rawYesNo;
+      const topicInsight = getCardTopicInsight(meanings, c.keywords, topic, isRev);
       return {
         cardId: c.id,
         position: positions[i] || `Card ${i + 1}`,
@@ -561,33 +783,59 @@ tarotRouter.post(
         orientation: orient,
         keywords: c.keywords,
         meaning: isRev
-          ? (c.meanings?.reversed || c.meanings?.upright || c.meanings?.[posKey])
-          : (c.meanings?.upright || c.meanings?.[posKey]),
-        past: c.meanings?.past,
-        present: c.meanings?.present,
-        future: c.meanings?.future,
-        love: c.meanings?.love,
-        career: c.meanings?.career,
-        advice: c.meanings?.advice,
-        yesNo: c.meanings?.yesNo,
+          ? (meanings?.reversed || meanings?.upright || meanings?.[posKey])
+          : (meanings?.upright || meanings?.[posKey]),
+        topicInsight,
+        past: meanings?.past,
+        present: meanings?.present,
+        future: meanings?.future,
+        love: meanings?.love,
+        career: meanings?.career,
+        money: topic === "Money" ? topicInsight : undefined,
+        health: topic === "Health" ? topicInsight : undefined,
+        advice: meanings?.advice,
+        yesNo: adjustedYesNo,
       };
     });
 
-    let interpretation = drawnCards
-      .map((c) => `${c.position}: ${c.name} (${c.orientation}) - ${c.meaning}`)
-      .join(" ");
+    const qLead = question
+      ? `In response to "${question}" within ${topic}: `
+      : `${topic} Reading Summary: `;
+    const verdictLead =
+      defaultMode === "yesNo"
+        ? `Oracle verdict leans ${drawnCards[0]?.yesNo || "Maybe"} through ${drawnCards[0]?.name} (${drawnCards[0]?.orientation}). `
+        : "";
+    let interpretation =
+      qLead +
+      verdictLead +
+      drawnCards
+        .map(
+          (c) =>
+            `${c.position} (${c.name}, ${c.orientation}): ${c.topicInsight || c.meaning}`,
+        )
+        .join(" ") +
+      (drawnCards[drawnCards.length - 1]?.advice
+        ? ` Key Advice: ${drawnCards[drawnCards.length - 1].advice}`
+        : "");
+
+    const currentUser = await User.findById(req.userId)
+      .select("language prefs.language")
+      .lean();
+    const preferredLang =
+      currentUser?.language || currentUser?.prefs?.language || "English";
 
     const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
     if (groqOrOpenAiKey) {
       try {
         const prompt = `You are an intuitive, insightful Tarot reader for Astro Galaxa.
+User Language: ${preferredLang} (reply naturally in this language).
 Spread Mode: ${defaultMode}
-Topic: ${topic}
-${question ? `Question: "${question}"` : ""}
+Life Area: ${topic}
+${question ? `User Question: "${question}" — address this question directly and practically.` : ""}
 Cards Drawn:
-${drawnCards.map((c) => `- ${c.position}: ${c.name} (${c.orientation}). Meaning: ${c.meaning}`).join("\n")}
+${drawnCards.map((c) => `- ${c.position}: ${c.name} (${c.orientation}). Core Meaning: ${c.meaning}. ${topic} Lens: ${c.topicInsight}`).join("\n")}
 
-Synthesize a cohesive 2-paragraph narrative reading interpreting these cards together. Provide inspiring, actionable guidance. Avoid fatalistic predictions or medical/legal advice.`;
+Synthesize a cohesive 2-paragraph narrative reading interpreting these cards specifically for the user's question and life area. Provide inspiring, clear guidance without fatalism or medical/legal advice.`;
 
         const resp = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
           method: "POST",
@@ -598,7 +846,7 @@ Synthesize a cohesive 2-paragraph narrative reading interpreting these cards tog
           body: JSON.stringify({
             model: env.AI_MODEL,
             messages: [
-              { role: "system", content: "You are a warm, empowering Tarot reader." },
+              { role: "system", content: `You are a warm, empowering Tarot reader. Respond in ${preferredLang}.` },
               { role: "user", content: prompt },
             ],
             temperature: 0.7,
