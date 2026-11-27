@@ -38,14 +38,28 @@ async function send(
   token?: string,
   method?: string,
 ) {
-  const response = await fetch(`${api}${path}`, {
-    method: method ?? (body ? "POST" : "GET"),
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${api}${path}`, {
+      method: method ?? (body ? "POST" : "GET"),
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (err) {
+    const isNetwork =
+      err instanceof TypeError ||
+      (err instanceof Error && err.message.toLowerCase().includes("fetch"));
+    if (isNetwork) {
+      throw new ApiError(
+        0,
+        "Cannot reach server. Please make sure the backend is running (npm run dev -w server).",
+      );
+    }
+    throw err;
+  }
   const json = await response.json();
   if (!response.ok)
     throw new ApiError(

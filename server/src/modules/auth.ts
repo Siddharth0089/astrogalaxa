@@ -94,25 +94,40 @@ authRouter.post(
       { upsert: true },
     ); } catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) return ok(res, { resendAfterSeconds: 30 }); throw error; }
     if (env.RESEND_API_KEY) {
-      const result = await new Resend(env.RESEND_API_KEY).emails.send({
-        from: env.EMAIL_FROM,
-        to: normalized,
-        subject: "Your Astro Galexa sign-in code",
-        text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.`,
-        html: `<div style="background:#000;color:#f5f5f7;padding:32px"><h1 style="color:#e8b64c">Astro Galexa</h1><p>Your sign-in code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, ignore this email.</p></div>`,
-      });
-      if (result.error) {
-        await OtpChallenge.deleteOne({
-          email: normalized,
-          codeHash: hashOtp(normalized, code),
+      try {
+        const result = await new Resend(env.RESEND_API_KEY).emails.send({
+          from: env.EMAIL_FROM,
+          to: normalized,
+          subject: "Your Astro Galaxa sign-in code",
+          text: `Your sign-in code is ${code}. It expires in 10 minutes. If you did not request this, ignore this email.`,
+          html: `<div style="background:#000;color:#f5f5f7;padding:32px"><h1 style="color:#e8b64c">Astro Galaxa</h1><p>Your sign-in code is <strong>${code}</strong>.</p><p>It expires in 10 minutes. If you did not request this, ignore this email.</p></div>`,
         });
-        throw new AppError(
-          503,
-          "EMAIL_UNAVAILABLE",
-          "Email sign-in is currently unavailable",
-        );
+        if (result.error) {
+          if (env.OTP_LOG_CODES) {
+            req.log.warn({ err: result.error, code }, "Resend delivery failed; logged Development OTP for testing");
+          } else {
+            await OtpChallenge.deleteOne({
+              email: normalized,
+              codeHash: hashOtp(normalized, code),
+            });
+            throw new AppError(
+              503,
+              "EMAIL_UNAVAILABLE",
+              "Email sign-in is currently unavailable",
+            );
+          }
+        }
+      } catch (sendErr) {
+        if (env.OTP_LOG_CODES) {
+          req.log.warn({ err: sendErr, code }, "Resend threw error; logged Development OTP for testing");
+        } else {
+          throw sendErr;
+        }
       }
-    } else if (env.OTP_LOG_CODES) req.log.info({ code }, "Development OTP");
+    }
+    if (env.OTP_LOG_CODES) {
+      req.log.info({ code }, "Development OTP");
+    }
     return ok(res, { resendAfterSeconds: 30 });
   }),
 );

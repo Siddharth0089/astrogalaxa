@@ -64,12 +64,27 @@ export function LoginScreen({
         <Button
           label={busy ? "Sending…" : "Send code"}
           disabled={busy}
+          busy={busy}
           onPress={onLogin}
         />
         {!!authError && (
-          <Text accessibilityRole="alert" style={{ color: "#FFB4AB" }}>
-            {authError}
-          </Text>
+          <View
+            style={{
+              backgroundColor: "rgba(239, 68, 68, 0.12)",
+              borderWidth: 1,
+              borderColor: "rgba(239, 68, 68, 0.35)",
+              borderRadius: 12,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+            }}
+          >
+            <Text
+              accessibilityRole="alert"
+              style={{ color: "#FCA5A5", fontSize: 13, lineHeight: 18, textAlign: "center" }}
+            >
+              {authError}
+            </Text>
+          </View>
         )}
         <Text style={s.helper}>
           We will email you a 6-digit code. No password needed.

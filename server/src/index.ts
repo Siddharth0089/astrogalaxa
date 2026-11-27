@@ -25,7 +25,16 @@ if (env.TRUST_PROXY) {
 const allowedOrigins = env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim()).filter(Boolean);
 app.use(pinoHttp({ logger, genReqId: () => crypto.randomUUID(), serializers: { req: (req: { id?: string; method?: string }) => ({ id: req.id, method: req.method }) } }));
 app.use(helmet());
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || (env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/.test(origin))) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '100kb' }));
 app.use(rateLimit({ windowMs: 15 * 60_000, max: 1000, standardHeaders: true, legacyHeaders: false }));
 app.get('/health', (_req, res) => ok(res, { status: 'ok' })); app.get('/ready', (_req, res) => ok(res, { status: mongoose.connection.readyState === 1 ? 'ready' : 'not_ready' }, mongoose.connection.readyState === 1 ? 200 : 503));
