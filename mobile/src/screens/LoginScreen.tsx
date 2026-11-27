@@ -1,7 +1,8 @@
-import React from "react";
-import { Alert, Image, ScrollView, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Image, ScrollView, Text, View } from "react-native";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { LegalModal, LegalTab } from "../components/LegalModal";
 import { s } from "../theme/styles";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -20,6 +21,14 @@ export function LoginScreen({
   authError: string;
   onLogin: () => void;
 }) {
+  const [legalVisible, setLegalVisible] = useState(false);
+  const [legalTab, setLegalTab] = useState<LegalTab>("terms");
+
+  const openLegal = (tab: LegalTab) => {
+    setLegalTab(tab);
+    setLegalVisible(true);
+  };
+
   return (
     <ScrollView
       contentContainerStyle={{
@@ -89,22 +98,24 @@ export function LoginScreen({
         <Text style={s.helper}>
           We will email you a 6-digit code. No password needed.
         </Text>
-        <Text style={s.or}>──────── or ────────</Text>
-        <Button
-          label="Continue with Google"
-          variant="glass"
-          onPress={() =>
-            Alert.alert(
-              "Google sign-in",
-              "Configure native Google client IDs and use a development build.",
-            )
-          }
-        />
       </View>
       <Text style={[s.footer, { marginTop: 36 }]}>
-        By continuing you agree to our <Text style={s.link}>Terms</Text> and{" "}
-        <Text style={s.link}>Privacy Policy</Text>
+        By continuing you agree to our{" "}
+        <Text style={s.link} onPress={() => openLegal("terms")}>
+          Terms
+        </Text>{" "}
+        and{" "}
+        <Text style={s.link} onPress={() => openLegal("privacy")}>
+          Privacy Policy
+        </Text>
       </Text>
+
+      <LegalModal
+        visible={legalVisible}
+        tab={legalTab}
+        onClose={() => setLegalVisible(false)}
+        onSwitchTab={setLegalTab}
+      />
     </ScrollView>
   );
 }

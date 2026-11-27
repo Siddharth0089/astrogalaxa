@@ -597,7 +597,7 @@ export default function App() {
   else if (screen === "chat")
     body = <ChatScreen onNavigate={go} name={name} language={language} />;
   else if (screen === "live")
-    body = <LiveScreen authenticated={Boolean(token)} onNavigate={go} />;
+    body = <LiveScreen authenticated={Boolean(token)} language={language} onNavigate={go} />;
   else if (screen === "tarot")
     body = (
       <TarotScreen

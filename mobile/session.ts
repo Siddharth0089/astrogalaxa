@@ -7,6 +7,18 @@ const api =
   (Platform.OS === "android"
     ? "http://10.0.2.2:3000/api/v1"
     : "http://localhost:3000/api/v1");
+
+export function getApiBaseUrl(): string {
+  return api;
+}
+
+export function getSocketUrl(): string {
+  return api.replace(/\/api\/v1\/?$/, "");
+}
+
+export function getAccessToken(): string | undefined {
+  return current?.accessToken;
+}
 const sessionKey = "nakshatra_session";
 const deviceKey = "nakshatra_device_id";
 export type UserProfile = {

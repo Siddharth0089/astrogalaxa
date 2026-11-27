@@ -85,6 +85,73 @@ usersRouter.get(
     });
   }),
 );
+usersRouter.post(
+  "/me/device-token",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const body = z
+      .object({
+        token: z.string().trim().min(10).max(512),
+        platform: z.enum(["ios", "android", "web"]),
+        appVersion: z.string().trim().max(40).optional(),
+      })
+      .strict()
+      .parse(req.body);
+    const saved = await DeviceToken.findOneAndUpdate(
+      { token: body.token },
+      {
+        $set: {
+          userId: req.userId,
+          platform: body.platform,
+          appVersion: body.appVersion ?? null,
+          lastSeenAt: new Date(),
+        },
+      },
+      { upsert: true, new: true },
+    ).lean();
+    ok(res, { registered: true, id: saved?._id?.toString() }, 201);
+  }),
+);
+usersRouter.delete(
+  "/me/device-token",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const { token } = z
+      .object({ token: z.string().trim().min(10).max(512) })
+      .strict()
+      .parse(req.body);
+    await DeviceToken.deleteOne({ userId: req.userId, token });
+    ok(res, { removed: true });
+  }),
+);
+usersRouter.get(
+  "/me/export",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const [u, kundli, readings, threads] = await Promise.all([
+      User.findById(req.userId)
+        .select("email name gender language birth nameSign sunSign prefs createdAt updatedAt")
+        .lean(),
+      Kundli.findOne({ userId: req.userId }).lean(),
+      TarotReading.find({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
+      ChatThread.find({ userId: req.userId }).sort({ startedAt: -1 }).lean(),
+    ]);
+    if (!u) throw new AppError(404, "USER_NOT_FOUND", "User not found");
+    const messages = threads.length
+      ? await ChatMessage.find({
+          threadId: { $in: threads.map((t) => t._id) },
+        })
+          .sort({ createdAt: 1 })
+          .select("threadId sender text createdAt")
+          .lean()
+      : [];
+    ok(res, {
+      exportedAt: new Date().toISOString(),
+      profile: u,
+      kundli,
+      tarotReadings: readings,
+      chatThreads: threads,
+      chatMessages: messages,
+    });
+  }),
+);
 usersRouter.patch(
   "/me",
   asyncRoute(async (req: AuthRequest, res) => {
@@ -148,6 +215,73 @@ usersRouter.patch(
       nameSign: u.nameSign,
       sunSign: u.sunSign,
       prefs: u.prefs,
+    });
+  }),
+);
+usersRouter.post(
+  "/me/device-token",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const body = z
+      .object({
+        token: z.string().trim().min(10).max(512),
+        platform: z.enum(["ios", "android", "web"]),
+        appVersion: z.string().trim().max(40).optional(),
+      })
+      .strict()
+      .parse(req.body);
+    const saved = await DeviceToken.findOneAndUpdate(
+      { token: body.token },
+      {
+        $set: {
+          userId: req.userId,
+          platform: body.platform,
+          appVersion: body.appVersion ?? null,
+          lastSeenAt: new Date(),
+        },
+      },
+      { upsert: true, new: true },
+    ).lean();
+    ok(res, { registered: true, id: saved?._id?.toString() }, 201);
+  }),
+);
+usersRouter.delete(
+  "/me/device-token",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const { token } = z
+      .object({ token: z.string().trim().min(10).max(512) })
+      .strict()
+      .parse(req.body);
+    await DeviceToken.deleteOne({ userId: req.userId, token });
+    ok(res, { removed: true });
+  }),
+);
+usersRouter.get(
+  "/me/export",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const [u, kundli, readings, threads] = await Promise.all([
+      User.findById(req.userId)
+        .select("email name gender language birth nameSign sunSign prefs createdAt updatedAt")
+        .lean(),
+      Kundli.findOne({ userId: req.userId }).lean(),
+      TarotReading.find({ userId: req.userId }).sort({ createdAt: -1 }).lean(),
+      ChatThread.find({ userId: req.userId }).sort({ startedAt: -1 }).lean(),
+    ]);
+    if (!u) throw new AppError(404, "USER_NOT_FOUND", "User not found");
+    const messages = threads.length
+      ? await ChatMessage.find({
+          threadId: { $in: threads.map((t) => t._id) },
+        })
+          .sort({ createdAt: 1 })
+          .select("threadId sender text createdAt")
+          .lean()
+      : [];
+    ok(res, {
+      exportedAt: new Date().toISOString(),
+      profile: u,
+      kundli,
+      tarotReadings: readings,
+      chatThreads: threads,
+      chatMessages: messages,
     });
   }),
 );
@@ -1250,6 +1384,13 @@ chatRouter.post(
     res.end();
   }),
 );
+type ThreadMessageEmitter = (threadId: string, payload: unknown) => void;
+let emitThreadMessage: ThreadMessageEmitter | null = null;
+
+export function registerThreadMessageEmitter(fn: ThreadMessageEmitter) {
+  emitThreadMessage = fn;
+}
+
 export const astrologersRouter = Router();
 astrologersRouter.use(requireAuth);
 astrologersRouter.get(
@@ -1271,5 +1412,232 @@ astrologersRouter.get(
         )
         .lean(),
     );
+  }),
+);
+astrologersRouter.post(
+  "/:id/connect",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const astrologerId = z
+      .string()
+      .regex(/^[a-f\d]{24}$/i)
+      .parse(req.params.id);
+    const { shareKundli = true } = z
+      .object({ shareKundli: z.boolean().optional() })
+      .parse(req.body ?? {});
+
+    const expert = await Astrologer.findOne({
+      _id: astrologerId,
+      verified: true,
+    }).lean();
+    if (!expert) {
+      throw new AppError(404, "ASTROLOGER_NOT_FOUND", "Astrologer not found");
+    }
+
+    let thread = await ChatThread.findOne({
+      type: "live",
+      userId: req.userId,
+      astrologerId: expert._id,
+      status: "active",
+    });
+    const isNew = !thread;
+    if (!thread) {
+      thread = await ChatThread.create({
+        type: "live",
+        userId: req.userId,
+        astrologerId: expert._id,
+        status: "active",
+        startedAt: new Date(),
+      });
+      const u = await User.findById(req.userId)
+        .select("name language prefs.language birth nameSign sunSign")
+        .lean();
+      const kundli = shareKundli
+        ? await Kundli.findOne({ userId: req.userId })
+            .select("ascendant moonSign nakshatra")
+            .lean()
+        : null;
+      const preferredLang = u?.language || u?.prefs?.language || "English";
+      const summary = kundli
+        ? ` [Shared Chart: Ascendant ${kundli.ascendant?.sign || "—"}, Moon ${kundli.moonSign || "—"}, Star ${kundli.nakshatra?.name || "—"}]`
+        : "";
+      const welcome =
+        preferredLang === "Hindi"
+          ? `नमस्ते${u?.name ? ` ${u.name}` : ""}! मैं ${expert.name} हूँ। आपकी निःशुल्क ज्योतिष परामर्श चैट शुरू हो गई है।${summary} अपना प्रश्न पूछें।`
+          : preferredLang === "Hinglish"
+            ? `Namaste${u?.name ? ` ${u.name}` : ""}! Main ${expert.name} hoon. Aapka free live consultation shuru ho gaya hai.${summary} Apna sawal poochhein.`
+            : `Hello${u?.name ? ` ${u.name}` : ""}! I am ${expert.name}. Your free live consultation session is now open.${summary} How can I guide you today?`;
+      await ChatMessage.create({
+        threadId: thread._id,
+        sender: "astrologer",
+        text: welcome,
+      });
+    }
+
+    const messages = await ChatMessage.find({ threadId: thread._id })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    ok(
+      res,
+      {
+        thread,
+        astrologer: expert,
+        messages,
+        shareKundli,
+      },
+      isNew ? 201 : 200,
+    );
+  }),
+);
+astrologersRouter.post(
+  "/threads/:id/messages",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const threadId = z
+      .string()
+      .regex(/^[a-f\d]{24}$/i)
+      .parse(req.params.id);
+    const { text, clientMsgId } = z
+      .object({
+        text: z.string().trim().min(1).max(2000),
+        clientMsgId: z.string().trim().max(120).optional(),
+      })
+      .strict()
+      .parse(req.body);
+
+    const thread = await ChatThread.findOne({
+      _id: threadId,
+      type: "live",
+      userId: req.userId,
+    });
+    if (!thread) throw new AppError(404, "THREAD_NOT_FOUND", "Session not found");
+    if (thread.status !== "active")
+      throw new AppError(409, "SESSION_ENDED", "This session has already ended");
+
+    let userMsg = clientMsgId
+      ? await ChatMessage.findOne({ threadId: thread._id, clientMsgId })
+      : null;
+    if (!userMsg) {
+      userMsg = await ChatMessage.create({
+        threadId: thread._id,
+        sender: "user",
+        text,
+        clientMsgId: clientMsgId || undefined,
+      });
+      emitThreadMessage?.(thread.id, userMsg);
+    }
+
+    let replyMsg = null;
+    const expert = thread.astrologerId
+      ? await Astrologer.findById(thread.astrologerId).lean()
+      : null;
+    const groqOrOpenAiKey = env.GROQ_API_KEY || env.AI_API_KEY;
+    const geminiKey = env.GEMINI_API_KEY;
+
+    const [u, kundli, recentMsgs] = await Promise.all([
+      User.findById(req.userId).lean(),
+      Kundli.findOne({ userId: req.userId }).lean(),
+      ChatMessage.find({ threadId: thread._id }).sort({ createdAt: -1 }).limit(6).lean(),
+    ]);
+    const preferredLang = u?.language || u?.prefs?.language || "English";
+    const sysPrompt = `${buildVedicPrompt(u, kundli)}\nYou are ${expert?.name || "a senior Vedic Astrologer"} in a free live consultation specializing in ${(expert?.specialties || ["General"]).join(", ")}. Respond in ${preferredLang} concisely and warmly.`;
+    let replyText =
+      preferredLang === "Hindi"
+        ? `धन्यवाद, मुझे आपका संदेश मिला: "${text}". आपकी जन्म कुंडली के अनुसार धैर्य और स्पष्ट संवाद से स्थिति अनुकूल होगी।`
+        : preferredLang === "Hinglish"
+          ? `Aapka sawal mil gaya hai ("${text}"). Aapke chart ke hisab se dhairya aur sahi timing par focus rakhna labhdayak rahega.`
+          : `Thank you for sharing your question ("${text}"). Reflecting on your natal placements, patience and steady focus will bring clarity over the coming period.`;
+
+    if (groqOrOpenAiKey) {
+      try {
+        const resp = await fetch(`${env.AI_BASE_URL}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${groqOrOpenAiKey}`,
+          },
+          body: JSON.stringify({
+            model: env.AI_MODEL,
+            messages: [
+              { role: "system", content: sysPrompt },
+              ...recentMsgs.reverse().map((m) => ({
+                role: m.sender === "user" ? ("user" as const) : ("assistant" as const),
+                content: m.text || "",
+              })),
+            ],
+            temperature: 0.7,
+            max_tokens: 400,
+          }),
+          signal: AbortSignal.timeout(10000),
+        });
+        if (resp.ok) {
+          const d = await resp.json();
+          replyText = d.choices?.[0]?.message?.content || replyText;
+        }
+      } catch {}
+    } else if (geminiKey) {
+      try {
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: `${sysPrompt}\nUser: ${text}` }] }],
+            }),
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        if (resp.ok) {
+          const d = await resp.json();
+          replyText = d.candidates?.[0]?.content?.parts?.[0]?.text || replyText;
+        }
+      } catch {}
+    }
+
+    replyMsg = await ChatMessage.create({
+      threadId: thread._id,
+      sender: "astrologer",
+      text: replyText,
+    });
+    emitThreadMessage?.(thread.id, replyMsg);
+
+    ok(res, { userMessage: userMsg, replyMessage: replyMsg }, 201);
+  }),
+);
+astrologersRouter.patch(
+  "/threads/:id/end",
+  asyncRoute(async (req: AuthRequest, res) => {
+    const threadId = z
+      .string()
+      .regex(/^[a-f\d]{24}$/i)
+      .parse(req.params.id);
+    const { rating } = z
+      .object({ rating: z.number().int().min(1).max(5).optional() })
+      .strict()
+      .parse(req.body ?? {});
+
+    const thread = await ChatThread.findOne({
+      _id: threadId,
+      type: "live",
+      userId: req.userId,
+    });
+    if (!thread) throw new AppError(404, "THREAD_NOT_FOUND", "Session not found");
+    thread.status = "ended";
+    thread.endedAt = new Date();
+    if (rating !== undefined) thread.rating = rating;
+    await thread.save();
+
+    if (rating !== undefined && thread.astrologerId) {
+      const expert = await Astrologer.findById(thread.astrologerId);
+      if (expert) {
+        const count = expert.ratingCount ?? 0;
+        const avg = expert.ratingAvg ?? 0;
+        const nextCount = count + 1;
+        expert.ratingCount = nextCount;
+        expert.ratingAvg = Number(((avg * count + rating) / nextCount).toFixed(2));
+        await expert.save();
+      }
+    }
+    ok(res, { ended: true, thread });
   }),
 );

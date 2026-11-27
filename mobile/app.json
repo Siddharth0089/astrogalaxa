@@ -13,11 +13,14 @@
       "backgroundColor": "#000000"
     },
     "ios": {
-      "bundleIdentifier": "com.nakshatra.app",
-      "supportsTablet": false
+      "bundleIdentifier": "com.astrogalaxa.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.nakshatra.app",
+      "package": "com.astrogalaxa.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
@@ -30,7 +33,7 @@
       "expo-secure-store"
     ],
     "extra": {
-      "apiUrl": "http://10.0.2.2:3000/api/v1"
+      "apiUrl": "https://api.astrogalaxa.com/api/v1"
     }
   }
 }

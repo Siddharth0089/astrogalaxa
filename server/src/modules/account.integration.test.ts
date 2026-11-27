@@ -497,4 +497,79 @@ describe("astrologers and unavailable AI", () => {
     expect(ai.status).toBe(503);
     expect(ai.body.error.code).toBe("AI_UNAVAILABLE");
   });
+
+  it("supports device token registration, data export, and free live consultations", async () => {
+    const user = await models.User.create({
+      email: "live-user@example.test",
+      name: "Aarav",
+      role: "user",
+      language: "English",
+    });
+    const session = await models.Session.create({
+      userId: user._id,
+      refreshTokenHash: "live-session",
+      expiresAt: new Date(Date.now() + 60000),
+    });
+    const token = jwt.sign(
+      { sub: user._id.toString(), sid: session._id.toString() },
+      secret,
+    );
+
+    const reg = await request(app)
+      .post("/users/me/device-token")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ token: "ExponentPushToken[test-token-123456]", platform: "android", appVersion: "1.0.0" });
+    expect(reg.status).toBe(201);
+    expect(reg.body.data.registered).toBe(true);
+
+    const del = await request(app)
+      .delete("/users/me/device-token")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ token: "ExponentPushToken[test-token-123456]" });
+    expect(del.status).toBe(200);
+    expect(del.body.data.removed).toBe(true);
+
+    const exported = await request(app)
+      .get("/users/me/export")
+      .set("Authorization", `Bearer ${token}`);
+    expect(exported.status).toBe(200);
+    expect(exported.body.data.profile.email).toBe("live-user@example.test");
+
+    const expert = await models.Astrologer.create({
+      name: "Acharya Dev",
+      specialties: ["Career"],
+      languages: ["English"],
+      pricePerMinute: 0,
+      status: "online",
+      verified: true,
+      ratingAvg: 0,
+      ratingCount: 0,
+    });
+
+    const connectRes = await request(app)
+      .post(`/astrologers/${expert.id}/connect`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ shareKundli: true });
+    expect(connectRes.status).toBe(201);
+    const threadId = connectRes.body.data.thread._id;
+    expect(connectRes.body.data.messages.length).toBeGreaterThanOrEqual(1);
+
+    const msgRes = await request(app)
+      .post(`/astrologers/threads/${threadId}/messages`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ text: "How is my career this quarter?", clientMsgId: "msg-1" });
+    expect(msgRes.status).toBe(201);
+    expect(msgRes.body.data.userMessage.text).toBe("How is my career this quarter?");
+    expect(msgRes.body.data.replyMessage.sender).toBe("astrologer");
+
+    const endRes = await request(app)
+      .patch(`/astrologers/threads/${threadId}/end`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ rating: 5 });
+    expect(endRes.status).toBe(200);
+    expect(endRes.body.data.ended).toBe(true);
+    const updatedExpert = await models.Astrologer.findById(expert._id);
+    expect(updatedExpert?.ratingAvg).toBe(5);
+    expect(updatedExpert?.ratingCount).toBe(1);
+  });
 });

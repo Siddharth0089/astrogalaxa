@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
+import { LegalModal, LegalTab } from "../components/LegalModal";
 import { Gender, Language, UserProfile } from "../types";
 import { apiRequest } from "../../session";
 import { C } from "../theme/colors";
@@ -35,7 +36,10 @@ export function ProfileScreen({
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [langStatus, setLangStatus] = useState("");
+  const [legalVisible, setLegalVisible] = useState(false);
+  const [legalTab, setLegalTab] = useState<LegalTab>("privacy");
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
 
@@ -96,6 +100,40 @@ export function ProfileScreen({
       setLangStatus("Applied ✓");
     } catch {
       setLangStatus("Tap Save changes below");
+    }
+  };
+
+  const exportData = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const payload = await apiRequest("/users/me/export", undefined, true);
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "astro-galaxa-data.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const readingsCount = Array.isArray(payload?.tarotReadings)
+          ? payload.tarotReadings.length
+          : 0;
+        const threadsCount = Array.isArray(payload?.chatThreads)
+          ? payload.chatThreads.length
+          : 0;
+        Alert.alert(
+          "Data Export Ready",
+          `Verified export: profile, Natal Chart (${payload?.kundli ? "present" : "none"}), ${readingsCount} Tarot readings, and ${threadsCount} chat threads.`,
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not export your data.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -322,6 +360,37 @@ export function ProfileScreen({
         disabled={saving}
         onPress={save}
       />
+      <Button
+        label={exporting ? "Exporting Data…" : "Export My Data (JSON)"}
+        onPress={exportData}
+        disabled={exporting}
+        variant="glass"
+      />
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "center",
+          gap: 18,
+          paddingVertical: 4,
+        }}
+      >
+        <Pressable
+          onPress={() => {
+            setLegalTab("terms");
+            setLegalVisible(true);
+          }}
+        >
+          <Text style={s.link}>Terms of Service</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setLegalTab("privacy");
+            setLegalVisible(true);
+          }}
+        >
+          <Text style={s.link}>Privacy Policy</Text>
+        </Pressable>
+      </View>
       <Button label="Log out" onPress={logout} variant="glass" />
       <Button
         label="Delete account"
@@ -336,6 +405,12 @@ export function ProfileScreen({
           )
         }
         variant="glass"
+      />
+      <LegalModal
+        visible={legalVisible}
+        tab={legalTab}
+        onClose={() => setLegalVisible(false)}
+        onSwitchTab={setLegalTab}
       />
     </ScrollView>
   );
