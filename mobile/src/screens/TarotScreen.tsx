@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Svg, { Circle, Path } from "react-native-svg";
 import { Button } from "../components/Button";
 import { Screen, TarotReading } from "../types";
 import { apiRequest } from "../../session";
@@ -19,7 +20,7 @@ import { s } from "../theme/styles";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const CARD_BACK_IMAGE = require("../../assets/card_back.png");
 
-type SpreadMode = "daily" | "threeCard" | "yesNo";
+type SpreadMode = "threeCard" | "daily" | "yesNo";
 
 type TarotQuota = {
   maxDailyCards: number;
@@ -27,6 +28,62 @@ type TarotQuota = {
   remainingToday: number;
   todaysReadingId: string | null;
 };
+
+const QUICK_PROMPTS: Record<string, string> = {
+  Career: "What energy surrounds my career growth?",
+  Love: "What should I understand about love right now?",
+  Health: "What restores my mind and body balance?",
+  Money: "What is shifting in my financial path?",
+  General: "What cosmic message do I need today?",
+};
+
+function SparkleIcon({ size = 14, color = C.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M12 2L14.3 9.7L22 12L14.3 14.3L12 22L9.7 14.3L2 12L9.7 9.7L12 2Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+function ShuffleIcon({ size = 14, color = "#F6E7B8" }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function SacredDivider() {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: "rgba(243, 197, 86, 0.2)",
+        }}
+      />
+      <Text style={{ color: C.gold, fontSize: 11 }}>✦</Text>
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: "rgba(243, 197, 86, 0.2)",
+        }}
+      />
+    </View>
+  );
+}
 
 export function TarotScreen({
   cards,
@@ -99,7 +156,6 @@ export function TarotScreen({
     }
   };
 
-  // Initial deck + quota load
   useEffect(() => {
     mounted.current = true;
     setCards([]);
@@ -150,7 +206,6 @@ export function TarotScreen({
     };
   }, [authenticated, retry, setCards]);
 
-  // Live filter deck in-place when Life Area or Question changes (no full-screen reload)
   useEffect(() => {
     if (!authenticated || !initialLoaded.current) return;
     const handle = setTimeout(() => {
@@ -278,18 +333,15 @@ export function TarotScreen({
       autoRevealTimer.current = null;
     }
 
-    let next: string[];
     if (cards.includes(id)) {
-      next = cards.filter((x) => x !== id);
-      setCards(next);
+      setCards(cards.filter((x) => x !== id));
       return;
     }
     if (cards.length >= targetCount) return;
 
-    next = [...cards, id];
+    const next = [...cards, id];
     setCards(next);
 
-    // Automatically open flip reveal & prediction as soon as the final needed card is picked
     if (next.length === targetCount) {
       autoRevealTimer.current = setTimeout(() => {
         void submitReading(next);
@@ -297,12 +349,26 @@ export function TarotScreen({
     }
   };
 
+  const slotLabels =
+    mode === "threeCard"
+      ? [
+          { num: "I", title: "Past" },
+          { num: "II", title: "Present" },
+          { num: "III", title: "Future" },
+        ]
+      : [
+          {
+            num: "I",
+            title: mode === "yesNo" ? "Verdict" : "Soul Guidance",
+          },
+        ];
+
   return (
     <ScrollView
-      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 110, gap: 16 }]}
+      contentContainerStyle={[s.page, { paddingTop: 22, paddingBottom: 112, gap: 16 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Spiritual Editorial Header (No App Bar or Back Button) */}
+      {/* Sacred Editorial Header (No App Bar or Back Button) */}
       <View
         style={{
           flexDirection: "row",
@@ -312,106 +378,174 @@ export function TarotScreen({
         }}
       >
         <View style={{ flex: 1, gap: 4 }}>
-          <Text
-            style={{
-              color: C.gold,
-              fontSize: 11,
-              fontWeight: "700",
-              letterSpacing: 1.8,
-              textTransform: "uppercase",
-            }}
-          >
-            ✦ Sacred Tarot · {isFilteredByContext ? `${deck.length} Attuned` : `${deck.length || 78}-Card Arcana`}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <SparkleIcon size={12} />
+            <Text
+              style={{
+                color: C.gold,
+                fontSize: 11,
+                fontWeight: "700",
+                letterSpacing: 1.7,
+                textTransform: "uppercase",
+              }}
+            >
+              Sacred Tarot · {isFilteredByContext ? `${deck.length} Attuned` : `${deck.length || 78} Arcana`}
+            </Text>
+          </View>
           <Text style={s.title}>
             {viewJournal ? "Reading Journal" : "Tarot Sanctuary"}
           </Text>
-          {quota && !viewJournal && (
-            <View style={{ gap: 4, marginTop: 4 }}>
-              <View
-                style={{
-                  alignSelf: "flex-start",
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: quotaExhausted
-                    ? "rgba(255, 180, 171, 0.35)"
-                    : "rgba(243, 197, 86, 0.35)",
-                  backgroundColor: quotaExhausted
-                    ? "rgba(255, 180, 171, 0.1)"
-                    : "rgba(243, 197, 86, 0.1)",
-                }}
-              >
-                <Text
-                  style={{
-                    color: quotaExhausted ? "#FFB4AB" : "#F6E7B8",
-                    fontSize: 11,
-                    fontWeight: "700",
-                  }}
-                >
-                  {quotaExhausted
-                    ? `0 of ${maxDailyCards} daily cards left today`
-                    : `${remainingToday} of ${maxDailyCards} daily cards left today`}
-                </Text>
-              </View>
-              <Text style={{ color: C.muted, fontSize: 11 }}>
-                Shared daily allowance: 3-Card (3) · Daily Draw (1 each) · Yes/No (1 each)
-              </Text>
-            </View>
-          )}
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={viewJournal ? "Back to deck" : "View Journal"}
+          accessibilityLabel={viewJournal ? "Back to sanctuary" : "View Journal"}
           onPress={viewJournal ? () => setViewJournal(false) : loadJournal}
           style={{
             marginTop: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
             paddingHorizontal: 14,
-            paddingVertical: 8,
-            borderRadius: 12,
+            paddingVertical: 9,
+            borderRadius: 14,
             borderWidth: 1,
-            borderColor: viewJournal ? C.gold : C.border,
-            backgroundColor: viewJournal ? "rgba(243, 197, 86, 0.16)" : C.glass,
+            borderColor: viewJournal ? C.gold : "rgba(243, 197, 86, 0.28)",
+            backgroundColor: viewJournal
+              ? "rgba(243, 197, 86, 0.16)"
+              : "rgba(18, 16, 28, 0.85)",
           }}
         >
+          <Svg width={13} height={13} viewBox="0 0 24 24">
+            <Path
+              d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"
+              fill="none"
+              stroke={viewJournal ? C.gold : "#F6E7B8"}
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </Svg>
           <Text
             style={{
-              color: viewJournal ? C.gold : C.text,
+              color: viewJournal ? C.gold : "#F6E7B8",
               fontSize: 12,
               fontWeight: "700",
             }}
           >
-            {viewJournal ? "Draw Cards" : "Journal"}
+            {viewJournal ? "Sanctuary" : "Journal"}
           </Text>
         </Pressable>
       </View>
 
+      {/* Daily Cosmic Allowance Strip */}
+      {quota && !viewJournal && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: quotaExhausted
+              ? "rgba(255, 180, 171, 0.3)"
+              : "rgba(243, 197, 86, 0.24)",
+            backgroundColor: "rgba(18, 16, 28, 0.82)",
+            gap: 10,
+          }}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text
+              style={{
+                color: quotaExhausted ? "#FFB4AB" : "#F6E7B8",
+                fontSize: 12,
+                fontWeight: "700",
+              }}
+            >
+              {quotaExhausted
+                ? `Daily Sacred Allowance Complete (${maxDailyCards}/${maxDailyCards} drawn)`
+                : `${remainingToday} of ${maxDailyCards} Daily Card Pulls Remaining`}
+            </Text>
+            <Text style={{ color: C.muted, fontSize: 11 }}>
+              3-Card uses 3 · Daily Draw uses 1 · Yes / No uses 1
+            </Text>
+          </View>
+          <View style={{ flexDirection: "row", gap: 4 }}>
+            {Array.from({ length: maxDailyCards }).map((_, idx) => {
+              const available = idx < remainingToday;
+              return (
+                <View
+                  key={idx}
+                  style={{
+                    width: 9,
+                    height: 9,
+                    borderRadius: 4.5,
+                    backgroundColor: available ? C.gold : "rgba(255,255,255,0.14)",
+                    borderWidth: 1,
+                    borderColor: available
+                      ? "rgba(243, 197, 86, 0.9)"
+                      : "rgba(255,255,255,0.18)",
+                  }}
+                />
+              );
+            })}
+          </View>
+        </View>
+      )}
+
       {viewJournal ? (
-        /* Reading Journal History */
+        /* Illuminated Spiritual Journal History */
         <View style={{ gap: 14 }}>
           <Text style={s.sub}>
-            Revisit your previous tarot draws, cards, and personalized insights over time.
+            Revisit your archived sacred draws, archetypes, and oracle guidance across time.
           </Text>
 
           {journalLoading ? (
-            <Text style={s.sub}>Loading your journal…</Text>
+            <View
+              style={{
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.22)",
+                backgroundColor: "rgba(18, 16, 28, 0.78)",
+                padding: 20,
+              }}
+            >
+              <Text style={s.sub}>Opening your sacred archive…</Text>
+            </View>
           ) : journal.length === 0 ? (
-            <View style={[s.card, { alignItems: "center", padding: 24, gap: 10 }]}>
-              <Text style={{ fontSize: 32 }}>🔮</Text>
-              <Text style={s.cardTitle}>No Past Readings Yet</Text>
+            <View
+              style={{
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.28)",
+                backgroundColor: "rgba(18, 16, 28, 0.8)",
+                alignItems: "center",
+                padding: 26,
+                gap: 12,
+              }}
+            >
+              <SparkleIcon size={28} />
+              <Text style={[s.sign, { fontSize: 24 }]}>Your Sanctuary Awaits</Text>
               <Text style={[s.helper, { textAlign: "center" }]}>
-                Draw your first card to record guidance in your personal spiritual journal.
+                Draw your first reading to preserve personal tarot revelations in your journal.
               </Text>
-              <Button label="Draw Cards Now" onPress={() => setViewJournal(false)} />
+              <Button label="Return to Tarot Deck" onPress={() => setViewJournal(false)} />
             </View>
           ) : (
             journal.map((item, idx) => (
               <Pressable
                 key={item._id || String(idx)}
                 onPress={() => onReading({ ...item, fromJournal: true })}
-                style={[s.card, { gap: 8, padding: 16 }]}
+                style={{
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: "rgba(243, 197, 86, 0.26)",
+                  backgroundColor: "rgba(18, 16, 28, 0.82)",
+                  padding: 18,
+                  gap: 10,
+                }}
               >
                 <View
                   style={{
@@ -420,37 +554,59 @@ export function TarotScreen({
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: C.gold, fontWeight: "700", fontSize: 14 }}>
-                    {item.mode === "daily"
-                      ? "Daily Draw"
-                      : item.mode === "yesNo"
-                        ? "Yes / No Pull"
-                        : "3-Card Spread"}{" "}
-                    • {item.topic}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <SparkleIcon size={11} />
+                    <Text
+                      style={{
+                        color: C.gold,
+                        fontWeight: "700",
+                        fontSize: 11,
+                        letterSpacing: 1.2,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {item.mode === "daily"
+                        ? "Daily Draw"
+                        : item.mode === "yesNo"
+                          ? "Yes / No Oracle"
+                          : "3-Card Spread"}{" "}
+                      · {item.topic}
+                    </Text>
+                  </View>
                   {item.createdAt && (
                     <Text style={{ color: C.muted, fontSize: 11 }}>
                       {new Date(item.createdAt).toLocaleDateString()}
                     </Text>
                   )}
                 </View>
-                {item.question && (
-                  <Text style={{ color: "#E0D7C6", fontStyle: "italic", fontSize: 13 }}>
+
+                {item.question ? (
+                  <Text
+                    style={{
+                      color: "#F7F3EA",
+                      fontStyle: "italic",
+                      fontSize: 14,
+                      lineHeight: 20,
+                    }}
+                  >
                     &ldquo;{item.question}&rdquo;
                   </Text>
-                )}
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                ) : null}
+
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
                   {item.cards?.map((c) => (
                     <View
                       key={c.name + c.position}
                       style={{
-                        backgroundColor: "rgba(255,255,255,0.06)",
-                        paddingHorizontal: 8,
+                        backgroundColor: "rgba(243, 197, 86, 0.08)",
+                        borderWidth: 1,
+                        borderColor: "rgba(243, 197, 86, 0.2)",
+                        paddingHorizontal: 9,
                         paddingVertical: 4,
-                        borderRadius: 8,
+                        borderRadius: 9,
                       }}
                     >
-                      <Text style={{ color: C.text, fontSize: 11 }}>
+                      <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "600" }}>
                         {c.name} {c.orientation === "reversed" ? "↺" : "↑"}
                       </Text>
                     </View>
@@ -461,25 +617,40 @@ export function TarotScreen({
           )}
         </View>
       ) : (
-        /* Card Drawing Experience */
+        /* Sacred Ritual & Card Picking Flow */
         <>
           {quotaExhausted && (
             <View
-              style={[
-                s.card,
-                {
-                  padding: 18,
-                  gap: 10,
-                  borderColor: "rgba(243, 197, 86, 0.35)",
-                  backgroundColor: "rgba(243, 197, 86, 0.06)",
-                },
-              ]}
+              style={{
+                borderRadius: 22,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.34)",
+                backgroundColor: "rgba(18, 16, 28, 0.85)",
+                padding: 18,
+                gap: 10,
+                shadowColor: C.gold,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 16,
+                elevation: 4,
+              }}
             >
-              <Text style={{ color: C.gold, fontSize: 15, fontWeight: "700" }}>
-                ✨ Daily 3-Card Sanctuary Complete
-              </Text>
-              <Text style={[s.sub, { lineHeight: 20 }]}>
-                You have used all 3 daily cards across 3-Card, Daily Draw, and Yes/No spreads today. Fresh draws unlock at midnight.
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <SparkleIcon size={14} />
+                <Text
+                  style={{
+                    color: C.gold,
+                    fontSize: 12,
+                    fontWeight: "700",
+                    letterSpacing: 1.2,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Sanctuary Rest · Cycle Complete
+                </Text>
+              </View>
+              <Text style={[s.sub, { color: "#EAE3D2", lineHeight: 20 }]}>
+                You have drawn all 3 daily cards today so your intuition stays clear and unclouded. Fresh pulls unlock at midnight.
               </Text>
               <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
                 <Pressable
@@ -505,12 +676,12 @@ export function TarotScreen({
                     paddingVertical: 11,
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: "rgba(243, 197, 86, 0.4)",
-                    backgroundColor: C.glass,
+                    borderColor: "rgba(243, 197, 86, 0.38)",
+                    backgroundColor: "rgba(255, 255, 255, 0.04)",
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ color: C.text, fontWeight: "600", fontSize: 13 }}>
+                  <Text style={{ color: "#F6E7B8", fontWeight: "600", fontSize: 13 }}>
                     Ask AI Pandit
                   </Text>
                 </Pressable>
@@ -518,180 +689,320 @@ export function TarotScreen({
             </View>
           )}
 
-          {/* Spread Mode Selector */}
-          <View style={{ gap: 8 }}>
-            <Text style={s.label}>Spread Mode</Text>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              {(
-                [
-                  { id: "threeCard" as const, label: "3-Card", cap: "3 cards", icon: "✨", need: 3 },
-                  { id: "daily" as const, label: "Daily Draw", cap: "1 card", icon: "☀️", need: 1 },
-                  { id: "yesNo" as const, label: "Yes / No", cap: "1 card", icon: "⚖️", need: 1 },
-                ] as const
-              ).map((m) => {
-                const isSelected = mode === m.id;
-                const locked = quota !== null && m.need > remainingToday;
-                return (
-                  <Pressable
-                    key={m.id}
-                    onPress={() => {
-                      if (locked) {
-                        setError(
-                          remainingToday === 0
-                            ? "Daily 3-card limit reached for today. Visit your Journal or ask AI Pandit."
-                            : `Only ${remainingToday} daily card${remainingToday === 1 ? "" : "s"} left today — choose Daily Draw or Yes / No.`,
-                        );
-                        return;
-                      }
-                      setError("");
-                      setMode(m.id);
-                      setCards([]);
+          {/* Modern Cosmic Segmented Spread Selector (Matching KundliScreen) */}
+          <View
+            style={{
+              flexDirection: "row",
+              backgroundColor: "rgba(18, 16, 28, 0.85)",
+              borderWidth: 1,
+              borderColor: "rgba(243, 197, 86, 0.22)",
+              borderRadius: 16,
+              padding: 4,
+              gap: 4,
+            }}
+          >
+            {(
+              [
+                { id: "threeCard" as const, label: "3-Card", cap: "3 cards", need: 3 },
+                { id: "daily" as const, label: "Daily Draw", cap: "1 card", need: 1 },
+                { id: "yesNo" as const, label: "Yes / No", cap: "1 card", need: 1 },
+              ] as const
+            ).map((m) => {
+              const active = mode === m.id;
+              const locked = quota !== null && m.need > remainingToday;
+              return (
+                <Pressable
+                  key={m.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active, disabled: locked }}
+                  onPress={() => {
+                    if (locked) {
+                      setError(
+                        remainingToday === 0
+                          ? "Daily 3-card allowance complete for today. Revisit your Journal or consult AI Pandit."
+                          : `Only ${remainingToday} daily card${remainingToday === 1 ? "" : "s"} remaining today — choose Daily Draw or Yes / No.`,
+                      );
+                      return;
+                    }
+                    setError("");
+                    setMode(m.id);
+                    setCards([]);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 12,
+                    backgroundColor: active ? C.gold : "transparent",
+                    opacity: locked ? 0.42 : 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: active ? C.onGold : C.text,
+                      fontWeight: active ? "700" : "600",
+                      fontSize: 12,
                     }}
+                  >
+                    {m.label}
+                  </Text>
+                  <Text
+                    style={{
+                      color: active ? C.onGold : C.muted,
+                      fontSize: 10,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {m.cap}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Sacred Intention Altar Card */}
+          <View
+            style={{
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: "rgba(243, 197, 86, 0.30)",
+              backgroundColor: "rgba(18, 16, 28, 0.80)",
+              padding: 18,
+              gap: 14,
+              shadowColor: C.gold,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 16,
+              elevation: 4,
+            }}
+          >
+            {/* Question & Prompt */}
+            <View style={{ gap: 8 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <SparkleIcon size={12} />
+                  <Text
+                    style={{
+                      color: C.gold,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 1.4,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Focus & Intention
+                  </Text>
+                </View>
+                {!question.trim() ? (
+                  <Pressable
+                    onPress={() => setQuestion(QUICK_PROMPTS[topic] || QUICK_PROMPTS.General)}
+                  >
+                    <Text style={{ color: "#F6E7B8", fontSize: 11, fontWeight: "600" }}>
+                      + Suggest prompt
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable onPress={() => setQuestion("")}>
+                    <Text style={{ color: C.muted, fontSize: 11, fontWeight: "600" }}>
+                      Clear
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+
+              <TextInput
+                value={question}
+                onChangeText={setQuestion}
+                placeholder={QUICK_PROMPTS[topic] || QUICK_PROMPTS.General}
+                placeholderTextColor="rgba(196, 196, 204, 0.55)"
+                editable={!quotaExhausted}
+                style={{
+                  backgroundColor: "rgba(255, 255, 255, 0.04)",
+                  borderWidth: 1,
+                  borderColor: question.trim()
+                    ? "rgba(243, 197, 86, 0.45)"
+                    : "rgba(255, 255, 255, 0.12)",
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 11,
+                  color: "#F7F3EA",
+                  fontSize: 14,
+                }}
+              />
+            </View>
+
+            {/* Life Area / Relevance Filter */}
+            <View style={{ gap: 8 }}>
+              <Text
+                style={{
+                  color: C.muted,
+                  fontSize: 11,
+                  fontWeight: "700",
+                  letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                Life Area Resonance
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 7 }}>
+                {["Career", "Love", "Health", "Money", "General"].map((x) => {
+                  const selected = topic === x;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={x}
+                      onPress={() => {
+                        setShowAllCards(false);
+                        setTopic(x);
+                      }}
+                      key={x}
+                      style={{
+                        paddingHorizontal: 13,
+                        paddingVertical: 7,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: selected ? C.gold : "rgba(255, 255, 255, 0.14)",
+                        backgroundColor: selected
+                          ? C.gold
+                          : "rgba(255, 255, 255, 0.04)",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: selected ? C.onGold : "#E6E2D8",
+                          fontSize: 12,
+                          fontWeight: selected ? "700" : "600",
+                        }}
+                      >
+                        {x}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <SacredDivider />
+
+            {/* Sanctuary Pedestal Slots */}
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              {slotLabels.map((slot, i) => {
+                const filled = cards[i] !== undefined;
+                return (
+                  <View
+                    key={slot.title}
                     style={{
                       flex: 1,
-                      paddingVertical: 8,
-                      paddingHorizontal: 6,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 2,
-                      borderRadius: 12,
+                      borderRadius: 14,
                       borderWidth: 1,
-                      borderColor: isSelected ? C.gold : C.border,
-                      backgroundColor: isSelected ? C.gold : C.glass,
-                      opacity: locked ? 0.45 : 1,
+                      borderStyle: filled ? "solid" : "dashed",
+                      borderColor: filled
+                        ? "rgba(243, 197, 86, 0.7)"
+                        : "rgba(243, 197, 86, 0.25)",
+                      backgroundColor: filled
+                        ? "rgba(243, 197, 86, 0.09)"
+                        : "rgba(255, 255, 255, 0.025)",
+                      paddingVertical: 10,
+                      paddingHorizontal: 8,
+                      alignItems: "center",
+                      gap: 5,
                     }}
                   >
                     <Text
                       style={{
-                        color: isSelected ? C.onGold : C.text,
-                        fontWeight: isSelected ? "700" : "600",
-                        fontSize: 12,
-                      }}
-                    >
-                      {m.icon} {m.label}
-                    </Text>
-                    <Text
-                      style={{
-                        color: isSelected ? C.onGold : C.muted,
+                        color: filled ? C.gold : C.muted,
                         fontSize: 10,
-                        fontWeight: "600",
+                        fontWeight: "700",
+                        letterSpacing: 1.2,
+                        textTransform: "uppercase",
                       }}
                     >
-                      {m.cap}
+                      {slot.num} · {slot.title}
                     </Text>
-                  </Pressable>
+                    {filled ? (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 5,
+                        }}
+                      >
+                        <Image
+                          source={CARD_BACK_IMAGE}
+                          style={{ width: 16, height: 26, borderRadius: 3 }}
+                          resizeMode="cover"
+                        />
+                        <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "700" }}>
+                          Drawn
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={{ color: "rgba(196, 196, 204, 0.65)", fontSize: 11.5 }}>
+                        Select below
+                      </Text>
+                    )}
+                  </View>
                 );
               })}
             </View>
           </View>
 
-          {/* Optional Question Input */}
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Your Question (optional)</Text>
-            <TextInput
-              value={question}
-              onChangeText={setQuestion}
-              placeholder="e.g. Will I get my promotion or new love soon?"
-              placeholderTextColor={C.muted}
-              editable={!quotaExhausted}
-              style={{
-                backgroundColor: C.glass,
-                borderWidth: 1,
-                borderColor: C.border,
-                borderRadius: 14,
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                color: C.text,
-                fontSize: 14,
-              }}
-            />
-          </View>
-
-          {/* Life Area / Topic Chips */}
-          <View style={{ gap: 6 }}>
-            <Text style={s.label}>Life Area (filters relevant cards)</Text>
-            <View style={s.chips}>
-              {["Career", "Love", "Health", "Money", "General"].map((x) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: topic === x }}
-                  accessibilityLabel={x}
-                  onPress={() => {
-                    setShowAllCards(false);
-                    setTopic(x);
-                  }}
-                  key={x}
-                >
-                  <Text style={[s.chip, topic === x && s.chipActive]}>{x}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          {/* Selection Slots */}
-          <View style={s.slots}>
-            {(mode === "threeCard"
-              ? ["Past", "Present", "Future"]
-              : [mode === "yesNo" ? "Verdict" : "Daily Guidance"]
-            ).map((x, i) => (
-              <View style={s.slot} key={x}>
-                <Text style={s.sub}>{x}</Text>
-                <Text
-                  style={[
-                    s.cardText,
-                    {
-                      color: cards[i] !== undefined ? C.gold : C.muted,
-                      fontWeight: cards[i] !== undefined ? "700" : "400",
-                    },
-                  ]}
-                >
-                  {cards[i] === undefined ? "Pick a card" : "✓ Ready to flip"}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Instant Action / Reveal Banner (Right above the deck so user never needs to scroll past cards) */}
+          {/* Instant Action / Reveal Banner */}
           {(cards.length === targetCount || busy) && !quotaExhausted && (
             <Button
-              label={busy ? "Flipping & Reading Your Cards…" : "✨ Flip & Reveal Prediction"}
+              label={busy ? "Turning & Reading Your Cards…" : "✦ Reveal & Flip Prediction"}
               disabled={busy || cards.length !== targetCount}
               onPress={() => void submitReading(cards)}
             />
           )}
 
-          {/* Filter indicator + Shuffle Deck Action */}
+          {/* Deck Status & Sacred Shuffle Control */}
           <View
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
               gap: 8,
-              marginTop: 2,
+              paddingHorizontal: 2,
             }}
           >
-            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
-              <Text style={[s.helper, { marginVertical: 0 }]}>
-                {cards.length}/{targetCount} picked •{" "}
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: 7,
+              }}
+            >
+              <Text style={{ color: C.secondary, fontSize: 12, fontWeight: "600" }}>
                 {isFilteredByContext
-                  ? `${deck.length} ${topic}-aligned`
-                  : `${deck.length}-card deck`}
+                  ? `${deck.length} ${topic}-Aligned Cards`
+                  : `All ${deck.length} Sacred Cards`}
               </Text>
               {(topic !== "General" || question.trim().length > 0) && (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setShowAllCards((v) => !v)}
                   style={{
-                    paddingHorizontal: 8,
+                    paddingHorizontal: 9,
                     paddingVertical: 3,
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: "rgba(243, 197, 86, 0.3)",
-                    backgroundColor: "rgba(255,255,255,0.04)",
+                    borderColor: "rgba(243, 197, 86, 0.34)",
+                    backgroundColor: "rgba(18, 16, 28, 0.78)",
                   }}
                 >
                   <Text style={{ color: C.gold, fontSize: 10.5, fontWeight: "700" }}>
-                    {showAllCards ? "Filter Relevant" : "Show All 78"}
+                    {showAllCards ? "Attune to Topic" : "View All 78"}
                   </Text>
                 </Pressable>
               )}
@@ -705,16 +1016,16 @@ export function TarotScreen({
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5,
-                paddingHorizontal: 12,
-                paddingVertical: 7,
-                borderRadius: 10,
+                gap: 6,
+                paddingHorizontal: 13,
+                paddingVertical: 8,
+                borderRadius: 12,
                 backgroundColor: "rgba(243, 197, 86, 0.14)",
                 borderWidth: 1,
-                borderColor: "rgba(243, 197, 86, 0.38)",
+                borderColor: "rgba(243, 197, 86, 0.42)",
               }}
             >
-              <Text style={{ fontSize: 13 }}>🔀</Text>
+              <ShuffleIcon size={13} />
               <Text style={{ color: "#F6E7B8", fontSize: 12, fontWeight: "700" }}>
                 {shuffling ? "Shuffling…" : "Shuffle"}
               </Text>
@@ -727,11 +1038,43 @@ export function TarotScreen({
             </Text>
           )}
 
-          {/* Face-Down Card Grid featuring custom cosmic card_back.png artwork & in-place riffle animation */}
+          {/* Face-Down Card Spread (6-Column Sacred Constellation Grid) */}
           {loading ? (
-            <Text style={s.sub}>Preparing your deck…</Text>
+            <View
+              style={{
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.22)",
+                backgroundColor: "rgba(18, 16, 28, 0.78)",
+                padding: 20,
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Svg width={24} height={24} viewBox="0 0 24 24">
+                <Circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke={C.gold}
+                  strokeWidth="1.5"
+                />
+              </Svg>
+              <Text style={s.sub}>Consecrating the 78-card deck…</Text>
+            </View>
           ) : deck.length === 0 ? (
-            <View style={[s.card, { alignItems: "center", padding: 18, gap: 10 }]}>
+            <View
+              style={{
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: "rgba(243, 197, 86, 0.25)",
+                backgroundColor: "rgba(18, 16, 28, 0.8)",
+                alignItems: "center",
+                padding: 20,
+                gap: 10,
+              }}
+            >
               <Text style={[s.sub, { textAlign: "center" }]}>
                 {error || "Unable to load the Tarot deck right now."}
               </Text>
@@ -743,11 +1086,12 @@ export function TarotScreen({
                 flexDirection: "row",
                 flexWrap: "wrap",
                 justifyContent: "space-between",
-                rowGap: 8,
+                rowGap: 9,
               }}
             >
               {deck.map((card, i) => {
-                const isSelected = cards.includes(card.id);
+                const selectionOrder = cards.indexOf(card.id);
+                const isSelected = selectionOrder !== -1;
                 const direction = i % 2 === 0 ? 1 : -1;
 
                 const translateX = shuffleProgress.interpolate({
@@ -772,8 +1116,8 @@ export function TarotScreen({
                       transform: [
                         { translateX },
                         { rotate: rotateDeg },
-                        { scale: isSelected ? 1.08 : scaleShuffle },
-                        { translateY: isSelected ? -4 : 0 },
+                        { scale: isSelected ? 1.09 : scaleShuffle },
+                        { translateY: isSelected ? -5 : 0 },
                       ],
                     }}
                   >
@@ -790,12 +1134,14 @@ export function TarotScreen({
                         borderRadius: 7,
                         overflow: "hidden",
                         backgroundColor: "transparent",
+                        borderWidth: isSelected ? 1.5 : 0,
+                        borderColor: isSelected ? C.gold : "transparent",
                         opacity: quotaExhausted || spreadExceedsQuota ? 0.55 : 1,
                         shadowColor: isSelected ? C.gold : undefined,
                         shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: isSelected ? 0.9 : 0,
-                        shadowRadius: isSelected ? 8 : 0,
-                        elevation: isSelected ? 6 : 0,
+                        shadowOpacity: isSelected ? 0.95 : 0,
+                        shadowRadius: isSelected ? 10 : 0,
+                        elevation: isSelected ? 8 : 0,
                       }}
                     >
                       <Image
@@ -809,9 +1155,9 @@ export function TarotScreen({
                             position: "absolute",
                             top: 3,
                             right: 3,
-                            width: 16,
-                            height: 16,
-                            borderRadius: 8,
+                            width: 17,
+                            height: 17,
+                            borderRadius: 8.5,
                             backgroundColor: C.gold,
                             alignItems: "center",
                             justifyContent: "center",
@@ -820,11 +1166,11 @@ export function TarotScreen({
                           <Text
                             style={{
                               color: C.onGold,
-                              fontSize: 9,
+                              fontSize: 9.5,
                               fontWeight: "800",
                             }}
                           >
-                            ✓
+                            {selectionOrder + 1}
                           </Text>
                         </View>
                       )}
