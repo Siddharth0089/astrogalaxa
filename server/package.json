@@ -29,6 +29,7 @@
     "pino-http": "^10.3.0",
     "resend": "^4.1.2",
     "socket.io": "^4.8.1",
+    "swagger-ui-dist": "^5.36.0",
     "swagger-ui-express": "^5.0.1",
     "sweph": "^2.10.3-8",
     "zod": "^3.24.1"

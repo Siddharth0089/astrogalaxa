@@ -1,8 +1,9 @@
-import React from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { Button } from "../components/Button";
 import { Field } from "../components/Field";
 import { Place } from "../types";
+import { C } from "../theme/colors";
 import { s } from "../theme/styles";
 
 export function BirthDetailsScreen({
@@ -16,9 +17,7 @@ export function BirthDetailsScreen({
   setPlaces,
   placesError,
   setPlacesError,
-  searchingPlaces,
   onSave,
-  onBack,
 }: {
   name: string;
   setName: (n: string) => void;
@@ -30,80 +29,287 @@ export function BirthDetailsScreen({
   setPlaces: (p: Place[]) => void;
   placesError: string;
   setPlacesError: (e: string) => void;
-  searchingPlaces: boolean;
+  searchingPlaces?: boolean;
   onSave: () => void;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
+  // Parse initial time if exists (e.g. "06:40 AM" or "14:30")
+  const parsedTime = useMemo(() => {
+    if (!birth.time) return { h: "", m: "", p: "AM" as "AM" | "PM" };
+    const m12 = /^(0?[1-9]|1[0-2])\s*:\s*([0-5]\d)\s*(AM|PM)$/i.exec(birth.time.trim());
+    if (m12) {
+      return {
+        h: m12[1].padStart(2, "0"),
+        m: m12[2],
+        p: m12[3].toUpperCase() as "AM" | "PM",
+      };
+    }
+    const m24 = /^(\d{2}):(\d{2})$/.exec(birth.time.trim());
+    if (m24) {
+      const hourNum = Number(m24[1]);
+      return {
+        h: String(hourNum % 12 || 12).padStart(2, "0"),
+        m: m24[2],
+        p: hourNum >= 12 ? ("PM" as const) : ("AM" as const),
+      };
+    }
+    return { h: "", m: "", p: "AM" as "AM" | "PM" };
+  }, [birth.time]);
+
+  const [hour, setHour] = useState(parsedTime.h);
+  const [minute, setMinute] = useState(parsedTime.m);
+  const [period, setPeriod] = useState<"AM" | "PM">(parsedTime.p);
+
+  const updateTime = (newH: string, newM: string, newP: "AM" | "PM") => {
+    if (newH.trim() && newM.trim()) {
+      setBirth((prev) => ({
+        ...prev,
+        time: `${newH.padStart(2, "0")}:${newM.padStart(2, "0")} ${newP}`,
+      }));
+    } else if (!newH.trim() && !newM.trim()) {
+      setBirth((prev) => ({ ...prev, time: "" }));
+    }
+  };
+
   return (
-    <ScrollView contentContainerStyle={s.page}>
-      <View style={s.header}>
-        <Pressable accessibilityLabel="Go back" onPress={onBack} style={s.back}>
-          <Text style={s.backText}>‹</Text>
-        </Pressable>
-        <Text style={s.headerTitle}>Birth Details</Text>
-        <View style={s.back} />
+    <ScrollView
+      contentContainerStyle={[s.page, { paddingTop: 28, paddingBottom: 40 }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Professional Heading */}
+      <View style={{ gap: 6, marginBottom: 8 }}>
+        <Text style={s.title}>Tell Us About Yourself</Text>
+        <Text style={s.sub}>
+          Enter your birth details to generate your authentic Vedic Kundli and
+          personal astrological chart.
+        </Text>
       </View>
-      <Text style={s.title}>Tell us when you were born</Text>
-      <Text style={s.sub}>
-        We use this to create your kundli and find your zodiac sign.
-      </Text>
+
+      {/* Full Name */}
       <Field
         label="Full name"
         value={name}
         onChange={setName}
         placeholder="Your full name"
       />
+
+      {/* Date of Birth */}
       <Field
         label="Date of birth"
         value={birth.dob}
         onChange={(x) => setBirth({ ...birth, dob: x })}
         placeholder="DD / MM / YYYY"
       />
-      <Field
-        label="Time of birth (optional)"
-        value={birth.time}
-        onChange={(x) => setBirth({ ...birth, time: x })}
-        placeholder="HH : MM AM / PM"
-      />
-      <Text style={s.helper}>
-        Not sure? Skip it. Your sign will still be accurate, but the ascendant and house details need an exact time.
-      </Text>
-      <Field
-        label="Place of birth"
-        value={birth.place}
-        onChange={(x) => {
-          setSelectedPlace(null);
-          setPlacesError("");
-          setBirth({ ...birth, place: x });
-        }}
-        placeholder="Search city or town"
-      />
-      {searchingPlaces && <Text style={s.helper}>Searching places…</Text>}
-      {!!placesError && !selectedPlace && (
-        <Text style={s.helper}>{placesError}</Text>
-      )}
-      {places.map((place) => (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Select ${place.name}`}
-          key={`${place.lat}:${place.lng}`}
-          onPress={() => {
-            setSelectedPlace(place);
-            setBirth({ ...birth, place: place.name });
-            setPlaces([]);
+
+      {/* Modern Time of Birth with Hour, Minute, and AM/PM Toggle */}
+      <View style={{ gap: 8 }}>
+        <Text style={s.label}>Time of birth (optional)</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {/* Hour & Minute Container */}
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: C.glass,
+              borderWidth: 1,
+              borderColor: C.border,
+              borderRadius: 14,
+              height: 52,
+              paddingHorizontal: 12,
+            }}
+          >
+            <TextInput
+              accessibilityLabel="Birth hour"
+              value={hour}
+              onChangeText={(val) => {
+                const clean = val.replace(/\D/g, "").slice(0, 2);
+                if (clean === "" || (Number(clean) >= 0 && Number(clean) <= 12)) {
+                  setHour(clean);
+                  updateTime(clean, minute, period);
+                }
+              }}
+              placeholder="HH"
+              placeholderTextColor={C.muted}
+              keyboardType="number-pad"
+              maxLength={2}
+              style={{
+                flex: 1,
+                color: C.text,
+                fontSize: 16,
+                textAlign: "center",
+                fontWeight: "600",
+              }}
+            />
+            <Text
+              style={{
+                color: C.muted,
+                fontSize: 18,
+                fontWeight: "700",
+                paddingHorizontal: 4,
+              }}
+            >
+              :
+            </Text>
+            <TextInput
+              accessibilityLabel="Birth minute"
+              value={minute}
+              onChangeText={(val) => {
+                const clean = val.replace(/\D/g, "").slice(0, 2);
+                if (clean === "" || (Number(clean) >= 0 && Number(clean) <= 59)) {
+                  setMinute(clean);
+                  updateTime(hour, clean, period);
+                }
+              }}
+              placeholder="MM"
+              placeholderTextColor={C.muted}
+              keyboardType="number-pad"
+              maxLength={2}
+              style={{
+                flex: 1,
+                color: C.text,
+                fontSize: 16,
+                textAlign: "center",
+                fontWeight: "600",
+              }}
+            />
+          </View>
+
+          {/* AM / PM Segmented Toggle Buttons */}
+          <View
+            style={{
+              flexDirection: "row",
+              height: 52,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: C.border,
+              backgroundColor: C.glass,
+              overflow: "hidden",
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Select AM"
+              onPress={() => {
+                setPeriod("AM");
+                updateTime(hour, minute, "AM");
+              }}
+              style={{
+                paddingHorizontal: 16,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: period === "AM" ? C.gold : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  color: period === "AM" ? C.onGold : C.text,
+                  fontWeight: "700",
+                  fontSize: 14,
+                }}
+              >
+                AM
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Select PM"
+              onPress={() => {
+                setPeriod("PM");
+                updateTime(hour, minute, "PM");
+              }}
+              style={{
+                paddingHorizontal: 16,
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: period === "PM" ? C.gold : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  color: period === "PM" ? C.onGold : C.text,
+                  fontWeight: "700",
+                  fontSize: 14,
+                }}
+              >
+                PM
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+        <Text style={s.helper}>
+          Not sure? Skip it. Your sign will still be accurate, but the ascendant
+          and house details need an exact time.
+        </Text>
+      </View>
+
+      {/* Place of Birth with sleek inline quick suggestions (No screen-expanding cards) */}
+      <View style={{ gap: 8 }}>
+        <Field
+          label="Place of birth"
+          value={birth.place}
+          onChange={(x) => {
+            setSelectedPlace(null);
             setPlacesError("");
+            setBirth({ ...birth, place: x });
           }}
-          style={[s.card, { padding: 12 }]}
-        >
-          <Text style={s.cardText}>{place.name}</Text>
-        </Pressable>
-      ))}
-      {selectedPlace && (
-        <Text style={s.helper}>Selected: {selectedPlace.name}</Text>
-      )}
+          placeholder="Enter city, town, or complete address"
+        />
+
+        {/* Compact Quick Suggestion Pills (max 3) */}
+        {places.length > 0 && !selectedPlace && (
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              gap: 6,
+              marginTop: 2,
+            }}
+          >
+            {places.slice(0, 3).map((place) => (
+              <Pressable
+                key={`${place.lat}:${place.lng}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${place.name}`}
+                onPress={() => {
+                  setSelectedPlace(place);
+                  setBirth({ ...birth, place: place.name });
+                  setPlaces([]);
+                  setPlacesError("");
+                }}
+                style={{
+                  backgroundColor: "rgba(243, 197, 86, 0.12)",
+                  borderWidth: 1,
+                  borderColor: "rgba(243, 197, 86, 0.35)",
+                  borderRadius: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: "#F6E7B8", fontSize: 12 }}>
+                  📍 {place.name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {selectedPlace && (
+          <Text style={{ color: "#7FE0A8", fontSize: 12 }}>
+            ✓ Location set: {selectedPlace.name}
+          </Text>
+        )}
+        {!!placesError && !selectedPlace && (
+          <Text style={s.helper}>{placesError}</Text>
+        )}
+      </View>
+
       <Text style={s.helper}>
-        Location data provided by GeoNames via Open-Meteo.
+        Astronomical coordinates calculated via Swiss Ephemeris & Open-Meteo.
       </Text>
+
+      {/* Primary Action Button */}
       <Button label="Create my Kundli" onPress={onSave} />
     </ScrollView>
   );

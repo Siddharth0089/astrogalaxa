@@ -263,8 +263,11 @@ export default function App() {
   };
 
   const saveBirth = async () => {
-    if (!name.trim() || !birth.dob || !selectedPlace)
-      return Alert.alert("Complete all required fields");
+    if (!name.trim() || !birth.dob || (!selectedPlace && !birth.place.trim()))
+      return Alert.alert(
+        "Complete all required fields",
+        "Please enter your name, date of birth, and birth city or location.",
+      );
     const match = /^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/.exec(birth.dob);
     if (!match)
       return Alert.alert(
@@ -296,6 +299,26 @@ export default function App() {
     const time = timeMatch
       ? `${String((Number(timeMatch[1]) % 12) + (timeMatch[3].toUpperCase() === "PM" ? 12 : 0)).padStart(2, "0")}:${timeMatch[2]}`
       : null;
+
+    let placeToUse = selectedPlace;
+    if (!placeToUse && birth.place.trim()) {
+      try {
+        const results = await request(
+          `/places/search?q=${encodeURIComponent(birth.place.trim())}`,
+        );
+        if (results && results.length > 0) {
+          placeToUse = results[0];
+          setSelectedPlace(placeToUse);
+        }
+      } catch {}
+    }
+    if (!placeToUse) {
+      return Alert.alert(
+        "Location needed",
+        "Could not find coordinates for this location. Please enter a valid city or region.",
+      );
+    }
+
     try {
       const updated = await request(
         "/users/me",
@@ -304,10 +327,10 @@ export default function App() {
           birth: {
             dob: date.toISOString(),
             time,
-            placeName: selectedPlace.name,
-            lat: selectedPlace.lat,
-            lng: selectedPlace.lng,
-            timezone: selectedPlace.timezone,
+            placeName: placeToUse.name,
+            lat: placeToUse.lat,
+            lng: placeToUse.lng,
+            timezone: placeToUse.timezone,
           },
         },
         token,
