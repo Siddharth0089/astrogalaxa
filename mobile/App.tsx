@@ -439,7 +439,11 @@ export default function App() {
         codeInput={codeInput}
         onVerify={verify}
         onResend={login}
-        onChangeEmail={() => go("login")}
+        onChangeEmail={() => {
+          setCode("");
+          setAuthError("");
+          go("login");
+        }}
       />
     );
   else if (screen === "birth")
