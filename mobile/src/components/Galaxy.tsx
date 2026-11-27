@@ -12,7 +12,6 @@ import { C } from "../theme/colors";
 
 export function Galaxy({ children }: { children: React.ReactNode }) {
   const { width, height } = useWindowDimensions();
-  const canvasWidth = Math.min(width, 480);
   const nativeDriver = Platform.OS !== "web";
 
   // 6 asynchronous twinkle phases for organic, natural star twinkling
@@ -64,10 +63,10 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
     [twinkle0, twinkle1, twinkle2, twinkle3, twinkle4, twinkle5]
   );
 
-  // Deterministic starfield generation: 85 scattered twinkling stars
+  // Deterministic starfield generation spanning 100% of edge-to-edge screen
   const stars = useMemo(() => {
     const list = [];
-    const count = 85;
+    const count = 95;
     for (let i = 0; i < count; i++) {
       const xRatio = (((i * 53 + 17) % 997) / 997);
       const yRatio = (((i * 89 + 43) % 991) / 991);
@@ -91,13 +90,11 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
       style={{
         flex: 1,
         width: "100%",
-        maxWidth: 480,
-        alignSelf: "center",
         backgroundColor: C.bg,
         overflow: "hidden",
       }}
     >
-      {/* Deep Space Background with luminous central galactic core */}
+      {/* 100% Edge-to-Edge Deep Space Background */}
       <Svg
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
@@ -105,26 +102,17 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
         height="100%"
       >
         <Defs>
-          {/* Central Galactic Core Glow - softer, lighter cosmic center */}
-          <RadialGradient id="galacticCore" cx="50%" cy="45%" r="60%">
-            <Stop offset="0%" stopColor="#3730A3" stopOpacity="0.45" />
-            <Stop offset="25%" stopColor="#1E1B4B" stopOpacity="0.32" />
-            <Stop offset="60%" stopColor="#0B0F19" stopOpacity="0.16" />
-            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
-          </RadialGradient>
-          {/* Secondary celestial starlight haze in the center */}
-          <RadialGradient id="starlightHaze" cx="50%" cy="42%" r="35%">
-            <Stop offset="0%" stopColor="#4F46E5" stopOpacity="0.22" />
-            <Stop offset="60%" stopColor="#1E1B4B" stopOpacity="0.08" />
-            <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+          <RadialGradient id="deepNebula" cx="50%" cy="35%" r="70%">
+            <Stop offset="0" stopColor="#1E1B4B" stopOpacity=".22" />
+            <Stop offset="0.6" stopColor="#0B0F19" stopOpacity=".12" />
+            <Stop offset="1" stopColor="#000000" stopOpacity="0" />
           </RadialGradient>
         </Defs>
         <Rect width="100%" height="100%" fill="#000000" />
-        <Rect width="100%" height="100%" fill="url(#galacticCore)" />
-        <Rect width="100%" height="100%" fill="url(#starlightHaze)" />
+        <Rect width="100%" height="100%" fill="url(#deepNebula)" />
       </Svg>
 
-      {/* Twinkling Galaxy Stars Layer */}
+      {/* 100% Edge-to-Edge Twinkling Galaxy Stars Layer */}
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         {stars.map((s) => (
           <Animated.View
@@ -132,7 +120,7 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
             style={[
               styles.star,
               {
-                left: s.xRatio * canvasWidth,
+                left: s.xRatio * width,
                 top: s.yRatio * height,
                 width: s.size,
                 height: s.size,
@@ -148,8 +136,17 @@ export function Galaxy({ children }: { children: React.ReactNode }) {
         ))}
       </View>
 
-      {/* Screen Content Layer */}
-      {children}
+      {/* Screen Content Layer - Full width on phones, cleanly centered on large displays */}
+      <View
+        style={{
+          flex: 1,
+          width: "100%",
+          maxWidth: 480,
+          alignSelf: "center",
+        }}
+      >
+        {children}
+      </View>
     </View>
   );
 }
