@@ -77,7 +77,11 @@ export type UserProfile = {
 export type Planet = {
   id: string;
   sign: string;
+  degree?: number;
   house: number | null;
+  nakshatra?: string;
+  pada?: number;
+  retrograde?: boolean;
 };
 
 export type TarotReading = {
@@ -114,9 +118,10 @@ export type Horoscope = {
 
 export type KundliData = {
   accuracy: string;
-  ascendant: { sign: string } | null;
+  ayanamsa?: string;
+  ascendant: { sign: string; degree?: number } | null;
   moonSign: string;
-  nakshatra: { name: string };
+  nakshatra: { name: string; index?: number; pada?: number };
   planets: Planet[];
   dasha: {
     approximate: boolean;

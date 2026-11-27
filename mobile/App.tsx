@@ -380,6 +380,7 @@ export default function App() {
       );
       setNameSign(updated.nameSign ?? null);
       setSunSign(updated.sunSign ?? null);
+      setKundli(null);
       await updateSessionUser({
         name,
         gender,
