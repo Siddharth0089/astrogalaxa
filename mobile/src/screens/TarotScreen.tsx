@@ -985,20 +985,25 @@ export function TarotScreen({
             <View style={{ flexDirection: "row", gap: 10 }}>
               {slotLabels.map((slot, i) => {
                 const filled = cards[i] !== undefined;
+                const isNextSlot = !filled && i === cards.length && !modeExhausted;
                 return (
                   <View
                     key={slot.title}
                     style={{
                       flex: 1,
                       borderRadius: 14,
-                      borderWidth: 1,
-                      borderStyle: filled ? "solid" : "dashed",
+                      borderWidth: isNextSlot ? 1.5 : 1,
+                      borderStyle: filled || isNextSlot ? "solid" : "dashed",
                       borderColor: filled
-                        ? "rgba(243, 197, 86, 0.7)"
-                        : "rgba(243, 197, 86, 0.25)",
+                        ? "rgba(243, 197, 86, 0.78)"
+                        : isNextSlot
+                          ? "rgba(243, 197, 86, 0.52)"
+                          : "rgba(243, 197, 86, 0.22)",
                       backgroundColor: filled
-                        ? "rgba(243, 197, 86, 0.09)"
-                        : "rgba(255, 255, 255, 0.025)",
+                        ? "rgba(243, 197, 86, 0.12)"
+                        : isNextSlot
+                          ? "rgba(243, 197, 86, 0.05)"
+                          : "rgba(255, 255, 255, 0.025)",
                       paddingVertical: 10,
                       paddingHorizontal: 8,
                       alignItems: "center",
@@ -1007,7 +1012,7 @@ export function TarotScreen({
                   >
                     <Text
                       style={{
-                        color: filled ? C.gold : C.muted,
+                        color: filled || isNextSlot ? C.gold : C.muted,
                         fontSize: 10,
                         fontWeight: "700",
                         letterSpacing: 1.2,
@@ -1034,7 +1039,13 @@ export function TarotScreen({
                         </Text>
                       </View>
                     ) : (
-                      <Text style={{ color: "rgba(196, 196, 204, 0.65)", fontSize: 11.5 }}>
+                      <Text
+                        style={{
+                          color: isNextSlot ? "#F6E7B8" : "rgba(196, 196, 204, 0.65)",
+                          fontSize: 11.5,
+                          fontWeight: isNextSlot ? "600" : "400",
+                        }}
+                      >
                         {t.slots.selectBelow}
                       </Text>
                     )}
@@ -1044,13 +1055,59 @@ export function TarotScreen({
             </View>
           </View>
 
-          {/* Instant Action / Reveal Banner */}
-          {(cards.length === targetCount || busy) && !modeExhausted && (
-            <Button
-              label={busy ? t.revealBusy : t.revealCta}
-              disabled={busy || cards.length !== targetCount}
-              onPress={() => void submitReading(cards)}
-            />
+          {/* Clear Progress / Instant Reveal Banner (Always visible above the deck!) */}
+          {!modeExhausted && (
+            cards.length === targetCount || busy ? (
+              <Button
+                label={busy ? t.revealBusy : t.revealCta}
+                disabled={busy || cards.length !== targetCount}
+                onPress={() => void submitReading(cards)}
+              />
+            ) : (
+              <View
+                style={{
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: cards.length > 0 ? "rgba(243, 197, 86, 0.36)" : "rgba(243, 197, 86, 0.18)",
+                  backgroundColor: cards.length > 0 ? "rgba(243, 197, 86, 0.08)" : "rgba(18, 16, 28, 0.72)",
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    color: cards.length > 0 ? "#F6E7B8" : C.secondary,
+                    fontSize: 12.5,
+                    fontWeight: cards.length > 0 ? "700" : "500",
+                  }}
+                >
+                  {cards.length > 0 ? `${cards.length}/${targetCount} · ` : ""}
+                  {t.swipeHint(Math.max(1, targetCount - cards.length))}
+                </Text>
+                {cards.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setCards([])}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: "rgba(243, 197, 86, 0.3)",
+                    }}
+                  >
+                    <Text style={{ color: C.gold, fontSize: 11, fontWeight: "700" }}>
+                      {t.clear}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )
           )}
 
           {!!error && (

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Button } from "../components/Button";
@@ -76,6 +77,11 @@ function FlipCard({
   uprightLabel: string;
   reversedLabel: string;
 }) {
+  const { width } = useWindowDimensions();
+  const cardWidth = isSingle
+    ? 190
+    : Math.max(88, Math.min(116, Math.floor((Math.min(width, 600) - 64) / 3)));
+  const cardHeight = Math.round(cardWidth * 1.68);
   const flipAnim = useRef(new Animated.Value(flipped ? 1 : 0)).current;
   const nativeDriver = Platform.OS !== "web";
   const isReversed = card.orientation === "reversed";
@@ -118,7 +124,7 @@ function FlipCard({
   return (
     <View
       style={{
-        width: isSingle ? 190 : "31%",
+        width: cardWidth,
         alignItems: "center",
         gap: 8,
       }}
@@ -132,21 +138,22 @@ function FlipCard({
         }
         onPress={onFlip}
         style={{
-          width: "100%",
-          aspectRatio: 0.56,
-          minHeight: isSingle ? 316 : 172,
+          width: cardWidth,
+          height: cardHeight,
           position: "relative",
         }}
       >
         {/* Unflipped Sacred Back (card_back.png) */}
         <Animated.View
-          pointerEvents={flipped ? "none" : "auto"}
           style={{
             position: "absolute",
             top: 0,
             left: 0,
-            right: 0,
-            bottom: 0,
+            width: cardWidth,
+            height: cardHeight,
+            zIndex: flipped ? 1 : 2,
+            pointerEvents: "none",
+            backfaceVisibility: "hidden",
             opacity: backOpacity,
             transform: [
               { perspective: 1000 },
@@ -166,13 +173,15 @@ function FlipCard({
 
         {/* Illuminated Gold-Foil Parchment Front Face */}
         <Animated.View
-          pointerEvents={flipped ? "auto" : "none"}
           style={{
             position: "absolute",
             top: 0,
             left: 0,
-            right: 0,
-            bottom: 0,
+            width: cardWidth,
+            height: cardHeight,
+            zIndex: flipped ? 2 : 1,
+            pointerEvents: "none",
+            backfaceVisibility: "hidden",
             opacity: frontOpacity,
             transform: [
               { perspective: 1000 },
