@@ -313,6 +313,28 @@ usersRouter.delete(
     }
   }),
 );
+async function upsertUserKundli(userId: string, birth: any) {
+  const computed = computeKundli(userId, birth);
+  try {
+    return await Kundli.findOneAndUpdate({ userId }, computed, {
+      upsert: true,
+      new: true,
+    });
+  } catch (err) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      err.code === 11000
+    ) {
+      return await Kundli.findOneAndUpdate({ userId }, computed, {
+        new: true,
+      });
+    }
+    throw err;
+  }
+}
+
 export const kundliRouter = Router();
 kundliRouter.use(requireAuth);
 kundliRouter.get(
@@ -346,11 +368,8 @@ kundliRouter.get(
       const transits = computeTransits(plain.moonSign || "Aries");
       return ok(res, { ...plain, transits });
     }
-    const k = await Kundli.findOneAndUpdate(
-      { userId: u.id },
-      computeKundli(u.id, birth),
-      { upsert: true, new: true },
-    );
+    const k = await upsertUserKundli(u.id, birth);
+    if (!k) throw new AppError(503, "EPHEMERIS_UNAVAILABLE", "Planetary calculations are unavailable");
     const plain = k.toObject();
     const transits = computeTransits(plain.moonSign || "Aries");
     ok(res, { ...plain, transits });
@@ -366,13 +385,11 @@ kundliRouter.post(
         "BIRTH_DETAILS_REQUIRED",
         "Add birth details first",
       );
-    const k = computeKundli(u.id, u.birth);
-    await Kundli.findOneAndUpdate({ userId: u.id }, k, {
-      upsert: true,
-      new: true,
-    });
-    const transits = computeTransits(k.moonSign || "Aries");
-    ok(res, { ...k, transits });
+    const k = await upsertUserKundli(u.id, u.birth);
+    if (!k) throw new AppError(503, "EPHEMERIS_UNAVAILABLE", "Planetary calculations are unavailable");
+    const plain = k.toObject();
+    const transits = computeTransits(plain.moonSign || "Aries");
+    ok(res, { ...plain, transits });
   }),
 );
 kundliRouter.post(
@@ -1093,14 +1110,11 @@ function buildHouseHighlights(planets: any[] | undefined): string {
 }
 
 async function ensureUserKundli(userId: string, u: any) {
-  let kundli = await Kundli.findOne({ userId }).lean();
+  let kundli: any = await Kundli.findOne({ userId }).lean();
   if (!kundli && u?.birth?.dob) {
     try {
-      kundli = await Kundli.findOneAndUpdate(
-        { userId },
-        computeKundli(userId, u.birth),
-        { upsert: true, new: true },
-      ).lean();
+      const updated = await upsertUserKundli(userId, u.birth);
+      kundli = updated ? updated.toObject() : null;
     } catch {
       // Proceed cleanly if birth coordinates are incomplete
     }

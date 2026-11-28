@@ -203,12 +203,16 @@ export default function App() {
     return () => clearInterval(timer);
   }, [screen, resendAt]);
 
+  const horoscopeRef = useRef<Horoscope | null>(null);
+  horoscopeRef.current = horoscope;
+  const kundliRef = useRef<KundliData | null>(null);
+  kundliRef.current = kundli;
+
   useEffect(() => {
     if (screen !== "home" || !token) return;
     let active = true;
-    setHoroscope(null);
     setHoroscopeError("");
-    setHoroscopeLoading(true);
+    if (!horoscopeRef.current) setHoroscopeLoading(true);
     apiRequest("/horoscope/today", undefined, true)
       .then((value: Horoscope) => {
         if (active) setHoroscope(value);
@@ -230,20 +234,22 @@ export default function App() {
   }, [screen, token, horoscopeRetry]);
 
   useEffect(() => {
-    const needsKundli = screen === "kundli" || (screen === "chat" && !kundli);
+    const needsKundli =
+      screen === "kundli" || (screen === "chat" && !kundliRef.current);
     if (!needsKundli || !token) return;
     let active = true;
-    if (screen === "kundli") {
-      setKundliLoading(true);
+    const isKundliScreen = screen === "kundli";
+    if (isKundliScreen) {
       setKundliError("");
+      if (!kundliRef.current) setKundliLoading(true);
     }
     request("/kundli", undefined, token)
       .then((data: KundliData) => {
         if (active) setKundli(data);
       })
       .catch((error: unknown) => {
-        if (active && screen === "kundli") {
-          setKundli(null);
+        if (active && isKundliScreen) {
+          if (!kundliRef.current) setKundli(null);
           setKundliError(
             error instanceof Error
               ? error.message
@@ -252,12 +258,12 @@ export default function App() {
         }
       })
       .finally(() => {
-        if (active && screen === "kundli") setKundliLoading(false);
+        if (active && isKundliScreen) setKundliLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [screen, token, kundli, kundliRetry]);
+  }, [screen, token, kundliRetry]);
 
   useEffect(() => {
     if (screen !== "birth" || selectedPlace || birth.place.trim().length < 2) {

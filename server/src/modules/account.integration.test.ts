@@ -21,6 +21,7 @@ beforeAll(async () => {
   models = await import("../models.js");
   const {
     usersRouter,
+    kundliRouter,
     tarotRouter,
     publicRouter,
     astrologersRouter,
@@ -31,6 +32,7 @@ beforeAll(async () => {
   app = express();
   app.use(express.json());
   app.use("/users", usersRouter);
+  app.use("/kundli", kundliRouter);
   app.use("/tarot", tarotRouter);
   app.use("/astrologers", astrologersRouter);
   app.use("/chat", chatRouter);
@@ -729,5 +731,41 @@ describe("astrologers and unavailable AI", () => {
       globalThis.fetch = originalFetch;
       vi.stubEnv("GROQ_API_KEY", "");
     }
+  });
+
+  it("handles GET /kundli without birth time and under concurrent requests without 500", async () => {
+    const u = await models.User.create({
+      email: "notime-kundli@example.test",
+      name: "Siddharth",
+      language: "English",
+      birth: {
+        dob: new Date("2000-12-02T00:00:00.000Z"),
+        time: null,
+        placeName: "Udaipur, Rajasthan, India",
+        lat: 24.5854,
+        lng: 73.7125,
+        timezone: "Asia/Kolkata",
+      },
+    });
+    const session = await models.Session.create({
+      userId: u._id,
+      refreshTokenHash: "kundli-concurrent-session",
+      expiresAt: new Date(Date.now() + 60000),
+    });
+    const token = jwt.sign(
+      { sub: u._id.toString(), sid: session._id.toString() },
+      secret,
+    );
+
+    const [r1, r2] = await Promise.all([
+      request(app).get("/kundli").set("Authorization", `Bearer ${token}`),
+      request(app).get("/kundli").set("Authorization", `Bearer ${token}`),
+    ]);
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(r1.body.data.moonSign).toBeTruthy();
+    expect(r1.body.data.d9).toBeTruthy();
+    expect(r1.body.data.d10).toBeTruthy();
   });
 });
